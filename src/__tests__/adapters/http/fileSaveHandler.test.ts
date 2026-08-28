@@ -5,9 +5,10 @@ import os from 'os';
 import path from 'path';
 import { makeFileSaveHandler } from '../../../adapters/http/fileSaveHandler';
 import { makeAuthMiddleware } from '../../../adapters/http/authMiddleware';
-import { generateKeyPair } from '../../../core/security/keys';
+import { createToken } from '../../../adapters/security';
 import { AppConfig } from '../../../config/types';
 import { MAX_FILE_SIZE_BYTES } from '../../../core/files';
+import { buildRuntime, buildTestConfig } from './testRuntime';
 
 let tmpDir: string;
 
@@ -25,29 +26,14 @@ const write = (name: string, content: string): string => {
   return filePath;
 };
 
-const buildConfig = (filePath: string, overrides: Partial<AppConfig> = {}): AppConfig => {
-  const kp = generateKeyPair();
-  return {
-    port: 3000,
-    host: 'localhost',
-    useTls: false,
-    certPath: undefined,
-    keyPath: undefined,
-    securityEnabled: false,
-    otp: undefined,
-    tokenTtl: 300,
-    keysDir: '.reditor/keys',
-    jwtPrivateKey: kp.privateKey,
-    jwtPublicKey: kp.publicKey,
-    file: filePath,
-    ...overrides,
-  };
-};
+const buildConfig = (filePath: string, overrides: Partial<AppConfig> = {}): AppConfig =>
+  buildTestConfig({ file: filePath, ...overrides });
 
 const buildApp = (config: AppConfig) => {
+  const runtime = buildRuntime(config);
   const app = express();
-  app.use(express.json());
-  app.put('/file', makeAuthMiddleware(config), makeFileSaveHandler(config));
+  app.use(express.json({ limit: '1mb' }));
+  app.put('/file', makeAuthMiddleware(runtime), makeFileSaveHandler(runtime));
   return app;
 };
 
@@ -74,5 +60,28 @@ describe('PUT /file — no security', () => {
     const res = await request(app).put('/file').send({ content: bigContent });
     expect(res.status).toBe(413);
     expect(fs.readFileSync(filePath, 'utf8')).toBe('original');
+  });
+});
+
+describe('PUT /file — with security', () => {
+  it('returns 401 when Authorization header is missing', async () => {
+    const filePath = write('secret.txt', 'original');
+    const app = buildApp(buildConfig(filePath, { securityEnabled: true }));
+    const res = await request(app).put('/file').send({ content: 'updated' });
+    expect(res.status).toBe(401);
+    expect(fs.readFileSync(filePath, 'utf8')).toBe('original');
+  });
+
+  it('returns 204 with a valid JWT', async () => {
+    const filePath = write('secret.txt', 'original');
+    const config = buildConfig(filePath, { securityEnabled: true });
+    const token = createToken(config.jwtPrivateKey!, config.tokenTtl);
+    const app = buildApp(config);
+    const res = await request(app)
+      .put('/file')
+      .set('Authorization', `Bearer ${token}`)
+      .send({ content: 'updated' });
+    expect(res.status).toBe(204);
+    expect(fs.readFileSync(filePath, 'utf8')).toBe('updated');
   });
 });

@@ -1,46 +1,33 @@
 import path from 'path';
-import { buildProgram } from './adapters/cli/program';
+import { parseServeCommand } from './adapters/cli/program';
 import { startServer } from './adapters/http';
-import { generateOtp, generateKeyPair, loadKeyPair, saveKeyPair } from './core/security';
+import { generateOtp } from './core/security';
 import { loadConfig } from './config';
-import { ServeOptions } from './adapters/cli/program';
 import { logger, logFilePath } from './adapters/logger';
-import { validateFile, createFile } from './core/files';
+import { createFileStore } from './adapters/files';
+import { generateKeyPair, createTokenService } from './adapters/security';
 import { promptCreateFile } from './adapters/cli/promptCreate';
 
+const LOOPBACK_HOSTS = new Set(['localhost', '127.0.0.1', '::1']);
+
 async function main(): Promise<void> {
-  const program = buildProgram();
-  program.parse(process.argv);
-
-  const serveCmd = program.commands.find((c) => c.name() === 'serve');
-  const opts = serveCmd?.opts<ServeOptions>() ?? {
-    port: '3000',
-    host: 'localhost',
-    forceDisableSecurity: false,
-    tokenTtl: '300',
-    keysDir: '.reditor/keys',
-    forceOtp: undefined,
-    create: false,
-  };
-
-  // ── File validation (must happen before server starts) ─────────────────────
-  const rawFile: string | undefined = serveCmd?.args[0];
+  const { opts, file: rawFile } = parseServeCommand(process.argv);
 
   if (!rawFile) {
     logger.error('Missing required file path. Usage: reditor serve <file>');
     process.exit(1);
   }
 
+  const files = createFileStore();
   const absoluteFile = path.resolve(rawFile);
-  const validation = validateFile(absoluteFile);
+  const validation = files.validate(absoluteFile);
 
   if (!validation.ok) {
     const { error } = validation;
 
     if (error.kind === 'NOT_FOUND') {
       if (opts.create) {
-        // --create flag: skip prompt, create immediately
-        const created = createFile(absoluteFile);
+        const created = files.create(absoluteFile);
         if (!created.ok) {
           logger.error('Failed to create file', {
             file: absoluteFile,
@@ -50,13 +37,12 @@ async function main(): Promise<void> {
         }
         logger.info('File created', { file: absoluteFile });
       } else {
-        // No flag: always ask
         const confirmed = await promptCreateFile(absoluteFile);
         if (!confirmed) {
           process.stdout.write('\n  Aborted.\n\n');
           process.exit(0);
         }
-        const created = createFile(absoluteFile);
+        const created = files.create(absoluteFile);
         if (!created.ok) {
           logger.error('Failed to create file', {
             file: absoluteFile,
@@ -93,12 +79,22 @@ async function main(): Promise<void> {
       process.exit(1);
     }
   }
-  // ──────────────────────────────────────────────────────────────────────────
+
+  const port = Number(opts.port);
+  if (!Number.isInteger(port) || port < 1 || port > 65535) {
+    logger.error('Invalid port', { port: opts.port });
+    process.exit(1);
+  }
+
+  const tokenTtl = Number(opts.tokenTtl);
+  if (!Number.isFinite(tokenTtl) || tokenTtl <= 0) {
+    logger.error('Invalid token TTL', { tokenTtl: opts.tokenTtl });
+    process.exit(1);
+  }
 
   const securityEnabled = !opts.forceDisableSecurity;
   const isForced = securityEnabled && opts.forceOtp !== undefined;
   const otp = securityEnabled ? (opts.forceOtp ?? generateOtp()) : undefined;
-  const tokenTtl = Number(opts.tokenTtl);
 
   if (opts.forceDisableSecurity) {
     logger.warn('--force-disable-security is active: OTP and JWT auth are DISABLED');
@@ -115,24 +111,16 @@ async function main(): Promise<void> {
 
   let keyPair: { privateKey: string; publicKey: string } | undefined;
   if (securityEnabled) {
-    const existing = loadKeyPair(opts.keysDir);
-    if (existing) {
-      keyPair = existing;
-      logger.info('Loaded existing RSA signing keys', { keysDir: opts.keysDir });
-    } else {
-      keyPair = generateKeyPair();
-      saveKeyPair(keyPair, opts.keysDir);
-      logger.info('Generated new RSA-2048 signing keys', { keysDir: opts.keysDir });
-    }
+    keyPair = generateKeyPair();
+    logger.info('Generated ephemeral RSA-2048 signing keys for this process');
   }
 
   const config = loadConfig({
-    port: Number(opts.port),
+    port,
     host: opts.host,
     securityEnabled,
     otp,
     tokenTtl,
-    keysDir: opts.keysDir,
     jwtPrivateKey: keyPair?.privateKey,
     jwtPublicKey: keyPair?.publicKey,
     file: absoluteFile,
@@ -148,6 +136,14 @@ async function main(): Promise<void> {
     process.stdout.write(`  🔑 One-Time Password: ${otp}\n`);
     process.stdout.write(`  ⏱  Token TTL: ${tokenTtl}s\n`);
     process.stdout.write('     POST /auth/exchange-token with { "otp": "<code>" } to get a JWT.\n');
+    if (!LOOPBACK_HOSTS.has(opts.host)) {
+      logger.warn('Non-loopback bind: 3 failed OTP attempts will shut down the process', {
+        host: opts.host,
+      });
+      process.stdout.write(
+        `  ⚠️  Bound to ${opts.host}: 3 failed OTP attempts will shut down the server.\n`,
+      );
+    }
     process.stdout.write('\n');
   }
 
@@ -159,7 +155,12 @@ async function main(): Promise<void> {
     logFilePath,
   });
 
-  await startServer(config);
+  await startServer({
+    config,
+    logger,
+    files,
+    tokens: createTokenService(),
+  });
 }
 
 main().catch((err: Error) => {

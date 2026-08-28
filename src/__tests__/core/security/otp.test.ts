@@ -1,4 +1,4 @@
-import { generateOtp } from '../../../core/security/otp';
+import { generateOtp, otpMatches } from '../../../core/security/otp';
 
 describe('generateOtp', () => {
   it('returns a 6-digit numeric string', () => {
@@ -16,5 +16,19 @@ describe('generateOtp', () => {
   it('generates different values on successive calls', () => {
     const results = new Set(Array.from({ length: 20 }, generateOtp));
     expect(results.size).toBeGreaterThan(1);
+  });
+});
+
+describe('otpMatches', () => {
+  it('returns true for identical values', () => {
+    expect(otpMatches('123456', '123456')).toBe(true);
+  });
+
+  it('returns false for different values of the same length', () => {
+    expect(otpMatches('123456', '654321')).toBe(false);
+  });
+
+  it('returns false for different lengths', () => {
+    expect(otpMatches('123', '123456')).toBe(false);
   });
 });

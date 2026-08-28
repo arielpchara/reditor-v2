@@ -1,13 +1,10 @@
 import path from 'path';
 import { Request, Response } from 'express';
-import { AppConfig } from '../../config/types';
-import { readFile } from '../../core/files';
-import { RouteHandler } from './types';
-import { logger } from '../logger';
+import { HttpRuntime, RouteHandler } from './types';
 
-export const makeFileHandler = (config: AppConfig): RouteHandler => {
+export const makeFileHandler = ({ config, logger, files }: HttpRuntime): RouteHandler => {
   return (_req: Request, res: Response): void => {
-    const result = readFile(path.dirname(config.file), path.basename(config.file));
+    const result = files.read(path.dirname(config.file), path.basename(config.file));
 
     if (!result.ok) {
       const { error } = result;

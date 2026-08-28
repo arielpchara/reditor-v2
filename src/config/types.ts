@@ -7,7 +7,6 @@ export type AppConfig = {
   securityEnabled: boolean;
   otp: string | undefined;
   tokenTtl: number;
-  keysDir: string;
   jwtPrivateKey: string | undefined;
   jwtPublicKey: string | undefined;
   file: string;

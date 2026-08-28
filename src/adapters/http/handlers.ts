@@ -1,9 +1,7 @@
 import { Request, Response } from 'express';
-import { AppConfig } from '../../config/types';
-import { logger } from '../logger';
-import { RouteHandler } from './types';
+import { HttpRuntime, RouteHandler } from './types';
 
-export const makeHealthHandler = (config: AppConfig): RouteHandler => {
+export const makeHealthHandler = ({ config, logger }: HttpRuntime): RouteHandler => {
   return (_req: Request, res: Response): void => {
     logger.debug('Health check requested');
     res.json({ status: 'ok', securityEnabled: config.securityEnabled });

@@ -1,5 +1,5 @@
-import { createToken, verifyToken, buildTokenResult } from '../../../core/security/jwt';
-import { generateKeyPair } from '../../../core/security/keys';
+import { createToken, verifyToken, buildTokenResult } from '../../../adapters/security/jwt';
+import { generateKeyPair } from '../../../adapters/security/keys';
 
 describe('JWT — createToken', () => {
   let privateKey: string;

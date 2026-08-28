@@ -19,7 +19,6 @@ describe('parseServeCommand', () => {
     expect(opts.host).toBe('localhost');
     expect(opts.forceDisableSecurity).toBe(false);
     expect(opts.tokenTtl).toBe('300');
-    expect(opts.keysDir).toBe('.reditor/keys');
     expect(opts.forceOtp).toBeUndefined();
   });
 
@@ -51,11 +50,6 @@ describe('parseServeCommand', () => {
   it('parses --token-ttl', () => {
     const { opts } = parseServeCommand(argv('myfile.ts', '--token-ttl', '600'));
     expect(opts.tokenTtl).toBe('600');
-  });
-
-  it('parses --keys-dir', () => {
-    const { opts } = parseServeCommand(argv('myfile.ts', '--keys-dir', '/tmp/keys'));
-    expect(opts.keysDir).toBe('/tmp/keys');
   });
 
   it('parses --force-otp', () => {

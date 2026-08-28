@@ -1,8 +1,8 @@
 import fs from 'fs';
 import os from 'os';
 import path from 'path';
-import { writeFile } from '../../../core/files/writer';
-import { MAX_FILE_SIZE_BYTES } from '../../../core/files/types';
+import { writeFile } from '../../../adapters/files/writer';
+import { MAX_FILE_SIZE_BYTES } from '../../../core/files';
 
 let tmpDir: string;
 
@@ -27,6 +27,13 @@ describe('writeFile', () => {
     fs.writeFileSync(filePath, 'old content');
     writeFile(filePath, 'new content');
     expect(fs.readFileSync(filePath, 'utf8')).toBe('new content');
+  });
+
+  it('does not leave a tmp file after a successful write', () => {
+    const filePath = path.join(tmpDir, 'out.txt');
+    writeFile(filePath, 'hello');
+    const leftovers = fs.readdirSync(tmpDir).filter((name) => name.endsWith('.tmp'));
+    expect(leftovers).toEqual([]);
   });
 
   it('returns TOO_LARGE when content exceeds the size limit', () => {

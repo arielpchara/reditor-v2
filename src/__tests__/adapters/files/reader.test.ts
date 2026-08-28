@@ -1,8 +1,8 @@
 import fs from 'fs';
 import os from 'os';
 import path from 'path';
-import { readFile } from '../../../core/files/reader';
-import { MAX_FILE_SIZE_BYTES } from '../../../core/files/types';
+import { readFile } from '../../../adapters/files/reader';
+import { MAX_FILE_SIZE_BYTES } from '../../../core/files';
 
 let tmpDir: string;
 

@@ -11,7 +11,7 @@
 - **OTP rate limiting** — server crashes (`process.exit(1)`) after 3 failed OTP attempts, preventing brute-force access
 - **JWT authentication** — exchange OTP for a signed RS256 JWT token
 - **Configurable token TTL** — default 5 minutes, customisable via CLI
-- **Persistent RSA signing keys** — generated once, reused across restarts
+- **Ephemeral RSA signing keys** — generated in memory for the process lifetime; JWTs from a previous run cannot be reused
 - **Winston logging** — structured logs to console and `logs/reditor-<timestamp>.log`
 - **Startup file validation** — fails fast with a descriptive error if the file is missing, a directory, too large, or binary
 
@@ -64,8 +64,8 @@ npx reditor serve <file> [options]
 | `-H, --host <host>` | `localhost` | Host the server binds to |
 | `--force-disable-security` | `false` | **[DANGER]** Disable OTP and JWT auth — anyone on the network can read the file |
 | `--token-ttl <seconds>` | `300` | JWT token time-to-live in seconds |
-| `--keys-dir <path>` | `.reditor/keys` | Directory to store RSA signing key pair |
 | `--force-otp <otp>` | — | **[TEST ONLY]** Override the generated OTP with a fixed value |
+| `--create` | `false` | Create the file if it does not exist (skips the confirmation prompt) |
 | `-h, --help` | — | Display help |
 
 ### Examples
@@ -127,7 +127,8 @@ Exchange the OTP printed at startup for a signed RS256 JWT token. After **3 fail
 | Status | Reason |
 |---|---|
 | `401` | Missing or incorrect OTP (`attemptsLeft` field shows remaining tries) |
-| `403` | Security is not enabled |
+| `401` | OTP has already been used (OTP is single-use) |
+| `404` | Route is not registered when security is disabled |
 | `500` | Signing key not available |
 
 Use the returned `token` as a `Bearer` header for subsequent requests.
@@ -194,10 +195,11 @@ Security (OTP + JWT) is **enabled by default**. Use `--force-disable-security` o
 
 When security is active:
 
-1. An **RSA-2048 key pair** is generated (or loaded if it already exists) from `--keys-dir`.
+1. An **RSA-2048 key pair** is generated in memory for this process (not written to disk). Restarting the server invalidates all existing JWTs.
 2. A **6-digit OTP** is generated using `crypto.randomInt` (cryptographically secure).
-3. The OTP is only valid for the current process lifetime.
+3. The OTP is valid for a **single successful exchange** in the current process lifetime.
 4. Tokens are signed with **RS256** and expire after `--token-ttl` seconds.
+5. After **3 failed OTP attempts** the process exits. Binding to a non-loopback host prints a warning because this is a denial-of-service vector.
 
 ## Configuration
 
@@ -207,7 +209,7 @@ Environment variables (all optional — CLI flags take precedence):
 |---|---|---|
 | `PORT` | `3000` | Port the server listens on |
 | `HOST` | `localhost` | Hostname the server binds to |
-| `USE_TLS` | `true` | Set to `false` to use plain HTTP |
+| `USE_TLS` | `true` | Set to `false` to use plain HTTP (independent of OTP/JWT) |
 | `CERT_PATH` | — | Path to TLS certificate file (PEM). If unset, a self-signed cert is generated |
 | `KEY_PATH` | — | Path to TLS private key file (PEM) |
 
@@ -237,15 +239,12 @@ See [AGENTS.md](./AGENTS.md) for full conventions and contribution guidelines.
 
 ```
 src/
-├── core/
-│   ├── security/  # OTP generation, RSA key pair, JWT signing
-│   └── files/     # file reading/writing, validation
-├── adapters/      # cli (commander) + http (express) + logger (winston)
-├── config/        # app configuration (AppConfig)
-└── bin.ts         # CLI entry point (npx)
-web/               # browser UI (React + Vite + prism-code-editor, built to dist/web/)
-rest/              # REST Client .http scenario files (one per controller)
-logs/              # runtime logs (gitignored)
+├── core/          # ports + pure domain (files, security, logging)
+├── adapters/      # cli, http, files (fs), security (jwt/keys), logger (winston)
+├── config/        # AppConfig
+└── bin.ts         # composition root
+web/               # React + Vite editor UI (built to dist/web/)
+rest/              # REST Client .http scenarios
 ```
 
 ## ⚠️ AI & Copilot Usage

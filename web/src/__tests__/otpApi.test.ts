@@ -1,9 +1,16 @@
-import { describe, it, expect, vi } from 'vitest';
-import { exchangeToken, MAX_OTP_ATTEMPTS, OtpFatalError } from '../otpApi';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import {
+  exchangeToken,
+  MAX_OTP_ATTEMPTS,
+  OtpFatalError,
+  storeSessionToken,
+  clearSessionToken,
+  getSessionToken,
+} from '../otpApi';
 
-const mockFetchOk = (token: string) =>
+const mockFetchOk = (token: string, expiresIn = 300) =>
   vi.fn().mockResolvedValue(
-    new Response(JSON.stringify({ token }), {
+    new Response(JSON.stringify({ token, expiresIn }), {
       status: 200,
       headers: { 'Content-Type': 'application/json' },
     }),
@@ -20,10 +27,21 @@ const mockFetchFail = (error: string, status = 401) =>
 const mockFetchNetworkError = () => vi.fn().mockRejectedValue(new TypeError('Failed to fetch'));
 
 describe('exchangeToken', () => {
-  it('returns ok:true with token on success', async () => {
-    const fetchFn = mockFetchOk('jwt-abc');
+  it('returns ok:true with token and expiresIn on success', async () => {
+    const fetchFn = mockFetchOk('jwt-abc', 600);
     const result = await exchangeToken('123456', fetchFn);
-    expect(result).toEqual({ ok: true, token: 'jwt-abc' });
+    expect(result).toEqual({ ok: true, token: 'jwt-abc', expiresIn: 600 });
+  });
+
+  it('defaults expiresIn to 300 when omitted', async () => {
+    const fetchFn = vi.fn().mockResolvedValue(
+      new Response(JSON.stringify({ token: 'jwt-abc' }), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      }),
+    );
+    const result = await exchangeToken('123456', fetchFn);
+    expect(result).toEqual({ ok: true, token: 'jwt-abc', expiresIn: 300 });
   });
 
   it('returns ok:false with error on 401', async () => {
@@ -62,12 +80,60 @@ describe('exchangeToken', () => {
     }
   });
 
+  it('returns invalid server response when 200 body is not JSON', async () => {
+    const fetchFn = vi.fn().mockResolvedValue(new Response('not-json', { status: 200 }));
+    const result = await exchangeToken('otp', fetchFn);
+    expect(result).toEqual({ ok: false, error: 'Invalid server response', shutdown: false });
+  });
+
+  it('returns invalid server response when token is missing', async () => {
+    const fetchFn = vi.fn().mockResolvedValue(
+      new Response(JSON.stringify({ expiresIn: 300 }), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      }),
+    );
+    const result = await exchangeToken('otp', fetchFn);
+    expect(result).toEqual({ ok: false, error: 'Invalid server response', shutdown: false });
+  });
+
   it('calls the correct endpoint with the OTP', async () => {
     const fetchFn = mockFetchOk('tok');
     await exchangeToken('myotp', fetchFn);
     const [url, init] = fetchFn.mock.calls[0] as [string, RequestInit];
     expect(url).toBe('/auth/exchange-token');
     expect(JSON.parse(init.body as string)).toEqual({ otp: 'myotp' });
+  });
+});
+
+describe('session token storage', () => {
+  beforeEach(() => {
+    sessionStorage.clear();
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-01-01T00:00:00Z'));
+  });
+
+  afterEach(() => {
+    sessionStorage.clear();
+    vi.useRealTimers();
+  });
+
+  it('stores and returns a valid token', () => {
+    storeSessionToken('abc', 300);
+    expect(getSessionToken()).toBe('abc');
+  });
+
+  it('returns null and clears storage after expiry', () => {
+    storeSessionToken('abc', 300);
+    vi.setSystemTime(new Date('2026-01-01T00:06:00Z'));
+    expect(getSessionToken()).toBeNull();
+    expect(sessionStorage.getItem('reditor_token')).toBeNull();
+  });
+
+  it('clearSessionToken removes the token', () => {
+    storeSessionToken('abc', 300);
+    clearSessionToken();
+    expect(getSessionToken()).toBeNull();
   });
 });
 

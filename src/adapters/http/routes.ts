@@ -1,6 +1,5 @@
 import { Express } from 'express';
-import { AppConfig } from '../../config/types';
-import { logger } from '../logger';
+import { HttpRuntime } from './types';
 import { makeHealthHandler } from './handlers';
 import { makeExchangeTokenHandler } from './authHandlers';
 import { makeFileHandler } from './fileHandlers';
@@ -8,26 +7,28 @@ import { makeFileSaveHandler } from './fileSaveHandler';
 import { makeFileMetaHandler } from './fileMetaHandler';
 import { makeAuthMiddleware } from './authMiddleware';
 
-export const registerRoutes = (app: Express, config: AppConfig): void => {
-  app.get('/health', makeHealthHandler(config));
+export const registerRoutes = (app: Express, runtime: HttpRuntime): void => {
+  const { config, logger } = runtime;
+
+  app.get('/health', makeHealthHandler(runtime));
   logger.info('Registered route: GET /health');
 
   if (config.securityEnabled) {
-    app.post('/auth/exchange-token', makeExchangeTokenHandler(config));
+    app.post('/auth/exchange-token', makeExchangeTokenHandler(runtime));
     logger.info('Registered route: POST /auth/exchange-token (security enabled)');
   }
 
-  const auth = makeAuthMiddleware(config);
+  const auth = makeAuthMiddleware(runtime);
 
-  app.get('/file-meta', auth, makeFileMetaHandler(config));
+  app.get('/file-meta', auth, makeFileMetaHandler(runtime));
   logger.info('Registered route: GET /file-meta', { authRequired: config.securityEnabled });
 
-  app.get('/file', auth, makeFileHandler(config));
+  app.get('/file', auth, makeFileHandler(runtime));
   logger.info('Registered route: GET /file', {
     authRequired: config.securityEnabled,
     file: config.file,
   });
 
-  app.put('/file', auth, makeFileSaveHandler(config));
+  app.put('/file', auth, makeFileSaveHandler(runtime));
   logger.info('Registered route: PUT /file', { authRequired: config.securityEnabled });
 };

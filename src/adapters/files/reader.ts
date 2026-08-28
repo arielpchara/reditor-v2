@@ -1,7 +1,14 @@
 import fs from 'fs';
 import path from 'path';
-import { FileResult, MAX_FILE_SIZE_BYTES } from './types';
-import { isTextBuffer, isWithinRoot, isWithinSizeLimit } from './validator';
+import {
+  FileResult,
+  MAX_FILE_SIZE_BYTES,
+  isTextBuffer,
+  isWithinRoot,
+  isWithinSizeLimit,
+} from '../../core/files';
+
+const errorMessage = (e: unknown): string => (e instanceof Error ? e.message : String(e));
 
 export const readFile = (rootDir: string, relativePath: string): FileResult => {
   const resolvedPath = path.resolve(rootDir, relativePath);
@@ -38,7 +45,7 @@ export const readFile = (rootDir: string, relativePath: string): FileResult => {
   } catch (e) {
     return {
       ok: false,
-      error: { kind: 'READ_ERROR', path: relativePath, message: (e as Error).message },
+      error: { kind: 'READ_ERROR', path: relativePath, message: errorMessage(e) },
     };
   }
 

@@ -19,3 +19,8 @@ export type JwtPayload = {
 export type TokenResult =
   | { ok: true; token: string; expiresIn: number }
   | { ok: false; error: string };
+
+export type TokenService = {
+  buildTokenResult: (keys: KeyPair, ttlSeconds: number) => { token: string; expiresIn: number };
+  verifyToken: (token: string, publicKey: string) => TokenResult;
+};

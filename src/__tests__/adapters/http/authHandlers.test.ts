@@ -1,32 +1,16 @@
 import request from 'supertest';
 import express from 'express';
 import { makeExchangeTokenHandler, MAX_OTP_ATTEMPTS } from '../../../adapters/http/authHandlers';
-import { generateKeyPair } from '../../../core/security/keys';
 import { AppConfig } from '../../../config/types';
+import { buildRuntime, buildTestConfig as baseConfig } from './testRuntime';
 
-const buildTestConfig = (overrides: Partial<AppConfig> = {}): AppConfig => {
-  const kp = generateKeyPair();
-  return {
-    port: 3000,
-    host: 'localhost',
-    useTls: false,
-    certPath: undefined,
-    keyPath: undefined,
-    securityEnabled: true,
-    otp: '123456',
-    tokenTtl: 300,
-    keysDir: '.reditor/keys',
-    jwtPrivateKey: kp.privateKey,
-    jwtPublicKey: kp.publicKey,
-    file: process.cwd() + '/package.json',
-    ...overrides,
-  };
-};
+const buildTestConfig = (overrides: Partial<AppConfig> = {}): AppConfig =>
+  baseConfig({ securityEnabled: true, otp: '123456', ...overrides });
 
 const buildApp = (config: AppConfig, exit?: (code: number) => void) => {
   const app = express();
   app.use(express.json());
-  app.post('/auth/exchange-token', makeExchangeTokenHandler(config, { exit }));
+  app.post('/auth/exchange-token', makeExchangeTokenHandler(buildRuntime(config), { exit }));
   return app;
 };
 
@@ -69,6 +53,21 @@ describe('POST /auth/exchange-token', () => {
     expect(res.status).toBe(500);
   });
 
+  it('rejects a second exchange after a successful one', async () => {
+    const app = buildApp(buildTestConfig());
+    const first = await request(app).post('/auth/exchange-token').send({ otp: '123456' });
+    expect(first.status).toBe(200);
+    const second = await request(app).post('/auth/exchange-token').send({ otp: '123456' });
+    expect(second.status).toBe(401);
+    expect(second.body.error).toMatch(/already been used/i);
+  });
+
+  it('returns 401 when body is missing', async () => {
+    const app = buildApp(buildTestConfig());
+    const res = await request(app).post('/auth/exchange-token');
+    expect(res.status).toBe(401);
+  });
+
   describe('OTP rate limiting', () => {
     it('returns attemptsLeft on failed attempt (below max)', async () => {
       const exit = jest.fn();
@@ -98,14 +97,35 @@ describe('POST /auth/exchange-token', () => {
       const exit = jest.fn();
       const app = buildApp(buildTestConfig(), exit);
 
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      let lastRes: any = null;
+      let lastStatus = 0;
+      let lastError = '';
       for (let i = 0; i < MAX_OTP_ATTEMPTS; i++) {
-        lastRes = await request(app).post('/auth/exchange-token').send({ otp: 'wrong' });
+        const res = await request(app).post('/auth/exchange-token').send({ otp: 'wrong' });
+        lastStatus = res.status;
+        lastError = res.body.error as string;
       }
 
-      expect(lastRes!.status).toBe(401);
-      expect(lastRes!.body.error).toMatch(/shutting down/i);
+      expect(lastStatus).toBe(401);
+      expect(lastError).toMatch(/shutting down/i);
+      jest.useRealTimers();
+    });
+
+    it('resets the strike counter after a successful exchange', async () => {
+      jest.useFakeTimers();
+      const exit = jest.fn();
+      const app = buildApp(buildTestConfig(), exit);
+
+      await request(app).post('/auth/exchange-token').send({ otp: 'wrong' });
+      await request(app).post('/auth/exchange-token').send({ otp: 'wrong' });
+      const success = await request(app).post('/auth/exchange-token').send({ otp: '123456' });
+      expect(success.status).toBe(200);
+
+      const reused = await request(app).post('/auth/exchange-token').send({ otp: 'wrong' });
+      expect(reused.status).toBe(401);
+      expect(reused.body.error).toMatch(/already been used/i);
+
+      jest.runAllTimers();
+      expect(exit).not.toHaveBeenCalled();
       jest.useRealTimers();
     });
 

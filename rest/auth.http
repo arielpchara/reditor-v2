@@ -60,9 +60,20 @@ Content-Type: application/json
 
 ###
 
+### Exchange OTP for JWT — already used
+# Expected: 401 {"error":"OTP has already been used"}
+# (run the valid-OTP scenario first in the same process)
+POST {{baseUrl}}/auth/exchange-token
+Content-Type: application/json
+
+{
+  "otp": "123"
+}
+
+###
+
 ### Exchange OTP for JWT — security disabled
-# Expected: 403 {"error":"Security is not enabled"}
-# (start server with --force-disable-security to reproduce)
+# Expected: 404 (route is not registered when --force-disable-security is set)
 POST {{baseUrl}}/auth/exchange-token
 Content-Type: application/json
 

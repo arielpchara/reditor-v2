@@ -1,8 +1,6 @@
 import { Request, Response } from 'express';
-import { AppConfig } from '../../config/types';
-import { buildTokenResult } from '../../core/security/jwt';
-import { RouteHandler } from './types';
-import { logger } from '../logger';
+import { otpMatches } from '../../core/security/otp';
+import { HttpRuntime, RouteHandler } from './types';
 
 export const MAX_OTP_ATTEMPTS = 3;
 
@@ -10,12 +8,21 @@ type ExchangeHandlerDeps = {
   exit?: (code: number) => void;
 };
 
+const readOtp = (body: unknown): string | undefined => {
+  if (typeof body !== 'object' || body === null) return undefined;
+  if (!('otp' in body)) return undefined;
+  const value: unknown = (body as { otp: unknown }).otp;
+  return typeof value === 'string' ? value : undefined;
+};
+
 export const makeExchangeTokenHandler = (
-  config: AppConfig,
+  { config, logger, tokens }: HttpRuntime,
   deps: ExchangeHandlerDeps = {},
 ): RouteHandler => {
   const exit = deps.exit ?? ((code) => process.exit(code));
   let failedAttempts = 0;
+  let otp = config.otp;
+  let consumed = false;
 
   return (req: Request, res: Response): void => {
     if (!config.securityEnabled || !config.otp) {
@@ -24,13 +31,19 @@ export const makeExchangeTokenHandler = (
       return;
     }
 
-    const { otp } = req.body as { otp: string };
+    if (consumed || !otp) {
+      logger.warn('Token exchange rejected: OTP already used', { ip: req.ip });
+      res.status(401).json({ error: 'OTP has already been used' });
+      return;
+    }
 
-    if (!otp || otp !== config.otp) {
+    const provided = readOtp(req.body);
+
+    if (!provided || !otpMatches(provided, otp)) {
       failedAttempts += 1;
       const remaining = MAX_OTP_ATTEMPTS - failedAttempts;
       logger.warn('Token exchange rejected due to invalid OTP', {
-        hasOtp: Boolean(otp),
+        hasOtp: Boolean(provided),
         ip: req.ip,
         failedAttempts,
         remaining,
@@ -44,7 +57,6 @@ export const makeExchangeTokenHandler = (
         res
           .status(401)
           .json({ error: 'Invalid OTP. Maximum attempts exceeded — server is shutting down.' });
-        // Delay exit so the response can be flushed
         setTimeout(() => exit(1), 200);
         return;
       }
@@ -59,11 +71,14 @@ export const makeExchangeTokenHandler = (
       return;
     }
 
-    const result = buildTokenResult(
+    const result = tokens.buildTokenResult(
       { privateKey: config.jwtPrivateKey, publicKey: config.jwtPublicKey ?? '' },
       config.tokenTtl,
     );
 
+    failedAttempts = 0;
+    consumed = true;
+    otp = undefined;
     logger.info('Token exchange succeeded', { ip: req.ip, ttlSeconds: config.tokenTtl });
     res.json(result);
   };

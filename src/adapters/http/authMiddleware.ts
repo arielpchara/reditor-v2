@@ -1,10 +1,8 @@
 import { Request, Response, NextFunction } from 'express';
-import { AppConfig } from '../../config/types';
-import { verifyToken } from '../../core/security/jwt';
-import { logger } from '../logger';
+import { HttpRuntime } from './types';
 
 export const makeAuthMiddleware =
-  (config: AppConfig) =>
+  ({ config, logger, tokens }: HttpRuntime) =>
   (req: Request, res: Response, next: NextFunction): void => {
     if (!config.securityEnabled) {
       next();
@@ -22,7 +20,7 @@ export const makeAuthMiddleware =
     }
 
     const token = authHeader.slice(7);
-    const result = verifyToken(token, config.jwtPublicKey ?? '');
+    const result = tokens.verifyToken(token, config.jwtPublicKey ?? '');
 
     if (!result.ok) {
       logger.warn('Request blocked: invalid or expired JWT token', {

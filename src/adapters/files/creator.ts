@@ -1,11 +1,11 @@
 import fs from 'fs';
 import path from 'path';
-import { FileCreateResult } from './types';
+import { FileCreateResult } from '../../core/files';
 
 export const createFile = (filePath: string): FileCreateResult => {
   try {
     fs.mkdirSync(path.dirname(filePath), { recursive: true });
-    fs.writeFileSync(filePath, '', { flag: 'wx' }); // 'wx' fails if file already exists
+    fs.writeFileSync(filePath, '', { flag: 'wx' });
     return { ok: true };
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : String(err);

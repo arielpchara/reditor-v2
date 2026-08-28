@@ -5,7 +5,7 @@ import os from 'os';
 import path from 'path';
 import { makeFileMetaHandler } from '../../../adapters/http/fileMetaHandler';
 import { AppConfig } from '../../../config/types';
-import { generateKeyPair } from '../../../core/security/keys';
+import { buildRuntime, buildTestConfig } from './testRuntime';
 
 let tmpDir: string;
 
@@ -23,27 +23,11 @@ const write = (name: string, content: string): string => {
   return filePath;
 };
 
-const buildConfig = (filePath: string): AppConfig => {
-  const kp = generateKeyPair();
-  return {
-    port: 3000,
-    host: 'localhost',
-    useTls: false,
-    certPath: undefined,
-    keyPath: undefined,
-    securityEnabled: false,
-    otp: undefined,
-    tokenTtl: 300,
-    keysDir: '.reditor/keys',
-    jwtPrivateKey: kp.privateKey,
-    jwtPublicKey: kp.publicKey,
-    file: filePath,
-  };
-};
+const buildConfig = (filePath: string): AppConfig => buildTestConfig({ file: filePath });
 
 const buildApp = (config: AppConfig): express.Express => {
   const app = express();
-  app.get('/file-meta', makeFileMetaHandler(config));
+  app.get('/file-meta', makeFileMetaHandler(buildRuntime(config)));
   return app;
 };
 

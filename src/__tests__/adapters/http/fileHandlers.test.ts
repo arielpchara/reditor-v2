@@ -5,10 +5,10 @@ import os from 'os';
 import path from 'path';
 import { makeFileHandler } from '../../../adapters/http/fileHandlers';
 import { makeAuthMiddleware } from '../../../adapters/http/authMiddleware';
-import { generateKeyPair } from '../../../core/security/keys';
-import { createToken } from '../../../core/security/jwt';
+import { createToken } from '../../../adapters/security';
 import { AppConfig } from '../../../config/types';
 import { MAX_FILE_SIZE_BYTES } from '../../../core/files';
+import { buildRuntime, buildTestConfig } from './testRuntime';
 
 let tmpDir: string;
 
@@ -26,29 +26,14 @@ const write = (name: string, content: Buffer | string): string => {
   return filePath;
 };
 
-const buildConfig = (filePath: string, overrides: Partial<AppConfig> = {}): AppConfig => {
-  const kp = generateKeyPair();
-  return {
-    port: 3000,
-    host: 'localhost',
-    useTls: false,
-    certPath: undefined,
-    keyPath: undefined,
-    securityEnabled: false,
-    otp: undefined,
-    tokenTtl: 300,
-    keysDir: '.reditor/keys',
-    jwtPrivateKey: kp.privateKey,
-    jwtPublicKey: kp.publicKey,
-    file: filePath,
-    ...overrides,
-  };
-};
+const buildConfig = (filePath: string, overrides: Partial<AppConfig> = {}): AppConfig =>
+  buildTestConfig({ file: filePath, ...overrides });
 
 const buildApp = (config: AppConfig) => {
+  const runtime = buildRuntime(config);
   const app = express();
   app.use(express.json());
-  app.get('/file', makeAuthMiddleware(config), makeFileHandler(config));
+  app.get('/file', makeAuthMiddleware(runtime), makeFileHandler(runtime));
   return app;
 };
 

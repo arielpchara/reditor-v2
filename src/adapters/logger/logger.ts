@@ -1,6 +1,7 @@
 import fs from 'fs';
 import path from 'path';
 import winston from 'winston';
+import { Logger, LogMeta } from '../../core/logging';
 
 const LOG_DIR = path.resolve(process.cwd(), 'logs');
 fs.mkdirSync(LOG_DIR, { recursive: true });
@@ -17,7 +18,7 @@ const consoleFormat = winston.format.combine(
   }),
 );
 
-export const logger = winston.createLogger({
+const winstonLogger = winston.createLogger({
   level: process.env.LOG_LEVEL ?? 'info',
   transports: [
     new winston.transports.Console({
@@ -29,3 +30,20 @@ export const logger = winston.createLogger({
     }),
   ],
 });
+
+const log =
+  (level: 'info' | 'warn' | 'error' | 'debug') =>
+  (message: string, meta?: LogMeta): void => {
+    if (meta) {
+      winstonLogger[level](message, meta);
+      return;
+    }
+    winstonLogger[level](message);
+  };
+
+export const logger: Logger = {
+  info: log('info'),
+  warn: log('warn'),
+  error: log('error'),
+  debug: log('debug'),
+};

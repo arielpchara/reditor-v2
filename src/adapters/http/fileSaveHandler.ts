@@ -1,21 +1,20 @@
 import { Request, Response } from 'express';
-import { AppConfig } from '../../config/types';
-import { writeFile } from '../../core/files';
-import { RouteHandler } from './types';
-import { logger } from '../logger';
+import { HttpRuntime, RouteHandler } from './types';
 
 type SaveBody = { content?: unknown };
 
-export const makeFileSaveHandler = (config: AppConfig): RouteHandler => {
+export const makeFileSaveHandler = ({ config, logger, files }: HttpRuntime): RouteHandler => {
   return (req: Request, res: Response): void => {
-    const { content } = req.body as SaveBody;
+    const body: SaveBody | undefined =
+      typeof req.body === 'object' && req.body !== null ? (req.body as SaveBody) : undefined;
+    const content = body?.content;
 
     if (typeof content !== 'string') {
       res.status(400).json({ error: 'Request body must contain a "content" string field' });
       return;
     }
 
-    const result = writeFile(config.file, content);
+    const result = files.write(config.file, content);
 
     if (!result.ok) {
       const { error } = result;

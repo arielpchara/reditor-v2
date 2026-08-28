@@ -34,3 +34,10 @@ export type FileWriteResult = { ok: true } | { ok: false; error: FileWriteError 
 export type FileCreateError = { kind: 'CREATE_ERROR'; path: string; message: string };
 
 export type FileCreateResult = { ok: true } | { ok: false; error: FileCreateError };
+
+export type FileStore = {
+  read: (rootDir: string, relativePath: string) => FileResult;
+  write: (absolutePath: string, content: string) => FileWriteResult;
+  create: (filePath: string) => FileCreateResult;
+  validate: (absolutePath: string) => FileValidationResult;
+};

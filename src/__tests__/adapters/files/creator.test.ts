@@ -1,7 +1,7 @@
 import fs from 'fs';
 import os from 'os';
 import path from 'path';
-import { createFile } from '../../../core/files/creator';
+import { createFile } from '../../../adapters/files/creator';
 
 describe('createFile', () => {
   let tmpDir: string;

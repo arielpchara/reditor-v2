@@ -1,6 +1,6 @@
 import './OtpDialog.css';
-import { JSX, useState } from 'react';
-import { exchangeToken, FetchFn, MAX_OTP_ATTEMPTS } from '../../otpApi';
+import { JSX, useRef, useState } from 'react';
+import { exchangeToken, FetchFn, MAX_OTP_ATTEMPTS, storeSessionToken } from '../../otpApi';
 
 export type OtpDialogProps = {
   onSuccess: () => void;
@@ -14,23 +14,40 @@ export function OtpDialog({ onSuccess, fetchFn = fetch }: OtpDialogProps): JSX.E
   const [attempt, setAttempt] = useState(1);
   const [error, setError] = useState('');
   const [state, setState] = useState<DialogState>('input');
+  const inFlightRef = useRef(false);
 
   const handleSubmit = async (): Promise<void> => {
-    if (!otpValue.trim()) return;
+    if (!otpValue.trim() || inFlightRef.current) return;
 
+    inFlightRef.current = true;
     setState('loading');
     setError('');
 
     const result = await exchangeToken(otpValue.trim(), fetchFn);
 
     if (result.ok) {
-      sessionStorage.setItem('reditor_token', result.token);
+      storeSessionToken(result.token, result.expiresIn);
       onSuccess();
+      inFlightRef.current = false;
       return;
     }
 
-    if (result.shutdown || attempt >= MAX_OTP_ATTEMPTS) {
+    if (result.shutdown) {
       setState('fatal');
+      inFlightRef.current = false;
+      return;
+    }
+
+    if (/network error/i.test(result.error)) {
+      setError(result.error);
+      setState('input');
+      inFlightRef.current = false;
+      return;
+    }
+
+    if (attempt >= MAX_OTP_ATTEMPTS) {
+      setState('fatal');
+      inFlightRef.current = false;
       return;
     }
 
@@ -39,14 +56,22 @@ export function OtpDialog({ onSuccess, fetchFn = fetch }: OtpDialogProps): JSX.E
     setError(`${result.error} — attempt ${nextAttempt} of ${MAX_OTP_ATTEMPTS}`);
     setOtpValue('');
     setState('input');
+    inFlightRef.current = false;
   };
 
   if (state === 'fatal') {
     return (
       <div className="otp">
         <div className="otp__top" />
-        <div className="otp__dialog" role="dialog" aria-modal="true">
-          <p className="otp__fatal-title">reditor — session terminated</p>
+        <div
+          className="otp__dialog"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="otp-fatal-title"
+        >
+          <p className="otp__fatal-title" id="otp-fatal-title">
+            reditor — session terminated
+          </p>
           <p className="otp__fatal-message">
             Too many failed attempts.
             <br />
@@ -63,7 +88,13 @@ export function OtpDialog({ onSuccess, fetchFn = fetch }: OtpDialogProps): JSX.E
   return (
     <div className="otp">
       <div className="otp__top" />
-      <div className="otp__dialog" role="dialog" aria-modal="true">
+      <div
+        className="otp__dialog"
+        role="dialog"
+        aria-modal="true"
+        aria-label="One-time password"
+        aria-busy={isLoading}
+      >
         <div className="otp__field">
           <label className="otp__label" htmlFor="otp-input">
             Enter OTP:
@@ -72,6 +103,7 @@ export function OtpDialog({ onSuccess, fetchFn = fetch }: OtpDialogProps): JSX.E
             id="otp-input"
             className="otp__input"
             type="password"
+            inputMode="numeric"
             autoComplete="off"
             data-1p-ignore
             data-lpignore="true"

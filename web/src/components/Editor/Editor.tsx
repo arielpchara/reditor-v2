@@ -27,10 +27,9 @@ export function Editor({ language, value, onChange }: EditorProps): JSX.Element 
   const containerRef = useRef<HTMLDivElement>(null);
   const editorInstanceRef = useRef<ReturnType<typeof basicEditor> | null>(null);
   const [isEditorReady, setIsEditorReady] = useState(false);
-  // Mount the editor once with the initial value.
   useEffect(() => {
     if (!containerRef.current) return;
-    editorInstanceRef.current = basicEditor(
+    const editor = basicEditor(
       containerRef.current,
       {
         language,
@@ -45,17 +44,21 @@ export function Editor({ language, value, onChange }: EditorProps): JSX.Element 
         setIsEditorReady(true);
       },
     );
+    editorInstanceRef.current = editor;
+    return () => {
+      editor.remove();
+      editorInstanceRef.current = null;
+      setIsEditorReady(false);
+    };
+    // language/onChange/value are captured at mount; Editor is remounted when the file loads.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Sync external value changes (e.g. history restore) into the editor.
-  // Skip when the value already matches to avoid disrupting normal typing.
   useEffect(() => {
     const editor = editorInstanceRef.current;
     if (!editor || editor.value === value) return;
-    if (!isEditorReady) return; // Avoid syncing before the editor is ready.
-    editor.textarea.value = value;
-    editor.textarea.dispatchEvent(new InputEvent('input', { bubbles: true }));
+    if (!isEditorReady) return;
+    editor.setOptions({ value });
   }, [value, isEditorReady]);
 
   return <div ref={containerRef} className="editor" />;

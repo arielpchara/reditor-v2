@@ -1,9 +1,7 @@
 import fs from 'fs';
 import path from 'path';
 import { Request, Response } from 'express';
-import { AppConfig } from '../../config/types';
-import { RouteHandler } from './types';
-import { logger } from '../logger';
+import { HttpRuntime, RouteHandler } from './types';
 
 const MIME_MAP: Record<string, string> = {
   ts: 'text/typescript',
@@ -53,7 +51,7 @@ const detectShebang = (filepath: string): boolean => {
   }
 };
 
-export const makeFileMetaHandler = (config: AppConfig): RouteHandler => {
+export const makeFileMetaHandler = ({ config, logger }: HttpRuntime): RouteHandler => {
   return (_req: Request, res: Response): void => {
     const fullpath = path.resolve(config.file);
     const filename = path.basename(fullpath);

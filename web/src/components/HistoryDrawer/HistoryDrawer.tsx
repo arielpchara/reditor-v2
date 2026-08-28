@@ -1,4 +1,4 @@
-import { JSX } from 'react';
+import { JSX, useEffect } from 'react';
 import './HistoryDrawer.css';
 
 export type ContentVersion = {
@@ -45,7 +45,16 @@ export function HistoryDrawer({
   onClose,
   onRestore,
 }: HistoryDrawerProps): JSX.Element {
-  const sorted = [...versions].reverse(); // newest first
+  const sorted = [...versions].reverse();
+
+  useEffect(() => {
+    if (!isOpen) return;
+    const onKeyDown = (e: KeyboardEvent): void => {
+      if (e.key === 'Escape') onClose();
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [isOpen, onClose]);
 
   return (
     <>
@@ -54,10 +63,17 @@ export function HistoryDrawer({
         className={`history ${isOpen ? 'history--open' : ''}`}
         aria-label="File history"
         aria-hidden={!isOpen}
+        inert={!isOpen}
       >
         <div className="history__header">
           <span className="history__title">History</span>
-          <button className="history__close" onClick={onClose} aria-label="Close history">
+          <button
+            type="button"
+            className="history__close"
+            onClick={onClose}
+            aria-label="Close history"
+            tabIndex={isOpen ? 0 : -1}
+          >
             <svg viewBox="0 0 16 16" width="13" height="13" fill="currentColor">
               <path d="M3.72 3.72a.75.75 0 011.06 0L8 6.94l3.22-3.22a.749.749 0 111.06 1.06L9.06 8l3.22 3.22a.749.749 0 11-1.06 1.06L8 9.06l-3.22 3.22a.749.749 0 01-1.06-1.06L6.94 8 3.72 4.78a.75.75 0 010-1.06z" />
             </svg>
@@ -81,8 +97,10 @@ export function HistoryDrawer({
                   <span className="history__hash">{v.hash.slice(0, 7)}</span>
                 </div>
                 <button
+                  type="button"
                   className="history__restore"
                   disabled={isCurrent}
+                  tabIndex={isOpen ? 0 : -1}
                   onClick={() => onRestore(v.content)}
                 >
                   {isCurrent ? 'Current' : 'Restore'}

@@ -1,7 +1,4 @@
-export { readFile } from './reader';
-export { writeFile } from './writer';
-export { createFile } from './creator';
-export { isTextBuffer, isWithinRoot, isWithinSizeLimit, validateFile } from './validator';
+export { isTextBuffer, isWithinRoot, isWithinSizeLimit } from './validator';
 export { MAX_FILE_SIZE_BYTES } from './types';
 export type {
   FileContent,
@@ -12,4 +9,5 @@ export type {
   FileWriteResult,
   FileCreateError,
   FileCreateResult,
+  FileStore,
 } from './types';
