@@ -3,8 +3,8 @@
 # Use the REST Client VS Code extension to run these requests.
 #
 # Start server with a file:
-#   With security (default): npx reditor serve /path/to/your/file.ts
-#   No security:             npx reditor serve /path/to/your/file.ts --force-disable-security
+#   No OTP (default):   npx reditor serve /path/to/your/file.ts
+#   With OTP:           npx reditor serve /path/to/your/file.ts --enable-security
 #
 # When security is enabled, exchange an OTP for a token first (see auth.http),
 # then paste the token into @token below.

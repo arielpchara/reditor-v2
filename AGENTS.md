@@ -24,7 +24,7 @@ Reusable agent skills live in `skills/`. Each skill is a self-contained instruct
 
 **reditor** — edit files from your server in the browser.
 
-A Node.js CLI tool that spins up a local HTTPS server and exposes a browser-based file editor. Run `npx reditor serve <file>` on any machine and edit that file from any browser, with OTP + JWT security enabled by default.
+A Node.js CLI tool that spins up a local HTTPS server and exposes a browser-based file editor. Run `npx reditor serve <file>` on the server and `npx reditor tunnel <user@host> --port=8080` on your laptop, then edit from the browser. OTP is off by default; pass `--enable-security` to require it.
 
 ### Scenarios
 
@@ -35,6 +35,7 @@ A DevOps engineer needs to edit a complex config file. The shell editor is painf
 - runs without cloning and building the code
 - is published in the npm registry
 - `npx reditor serve <file> [options]`
+- `npx reditor tunnel <user@host> [--port 8080]` — recommended way to reach a remote serve
 - when installed should not require internet, only local network
 
 The project follows **Hexagonal Architecture** (ports & adapters).
@@ -44,13 +45,15 @@ src/
 ├── core/                        # Domain — types, ports, pure functions (no I/O)
 │   ├── files/                   # File predicates, result types, FileStore port
 │   ├── security/                # OTP, JWT types, TokenService port
-│   └── logging/                 # Logger port
+│   ├── logging/                 # Logger port
+│   └── tunnel/                  # SSH tunnel types, ssh args, TunnelOpener port
 ├── adapters/                    # Implementations that talk to the outside world
 │   ├── cli/                     # commander.js (program.ts, promptCreate.ts)
 │   ├── http/                    # Express HTTPS server + route handlers
 │   ├── files/                   # filesystem FileStore (read/write/create/validate)
 │   ├── security/                # jsonwebtoken + RSA key generation
-│   └── logger/                  # winston Logger implementation
+│   ├── logger/                  # winston Logger implementation
+│   └── tunnel/                  # ssh spawn (TunnelOpener)
 ├── config/                      # AppConfig + loadConfig()
 ├── bin.ts                       # Composition root (npx entry)
 └── index.ts                     # Public library API
@@ -94,7 +97,8 @@ HTTP handlers must not import `adapters/logger`, `adapters/files`, or `adapters/
 node dist/bin.js serve ./config.yaml
 node dist/bin.js serve ./app.conf --port 8080
 node dist/bin.js serve ./new.yaml --create
-npx reditor serve ./settings.json --force-disable-security
+node dist/bin.js tunnel user@host --port 8080
+npx reditor serve ./settings.json --enable-security
 ```
 
 ### Server (HTTPS)
@@ -105,7 +109,7 @@ npx reditor serve ./settings.json --force-disable-security
 - Set `CERT_PATH` / `KEY_PATH` to use your own certs
 - Set `PORT` / `HOST` to override defaults (CLI flags take precedence)
 - Serves the built web UI at `/`
-- API: `GET /health`, `POST /auth/exchange-token`, `GET /file-meta`, `GET /file`, `PUT /file`
+- API: `GET /health`, `POST /auth/exchange-token`, `GET /status`, `GET /file-meta`, `GET /file`, `PUT /file`
 
 ---
 
@@ -180,7 +184,8 @@ web/src/
 │   ├── OtpDialog/
 │   ├── Toolbar/
 │   ├── Toast/
-│   └── HistoryDrawer/
+│   ├── HistoryDrawer/
+│   └── StatusBar/
 ├── __tests__/
 │   ├── components/
 │   ├── otpApi.test.ts

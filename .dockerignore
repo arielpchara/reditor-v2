@@ -1,0 +1,10 @@
+node_modules
+web/node_modules
+.git
+.github
+coverage
+logs
+demo
+dist
+.reditor
+*.log

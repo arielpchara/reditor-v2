@@ -5,6 +5,7 @@ import { makeExchangeTokenHandler } from './authHandlers';
 import { makeFileHandler } from './fileHandlers';
 import { makeFileSaveHandler } from './fileSaveHandler';
 import { makeFileMetaHandler } from './fileMetaHandler';
+import { makeStatusHandler } from './statusHandler';
 import { makeAuthMiddleware } from './authMiddleware';
 
 export const registerRoutes = (app: Express, runtime: HttpRuntime): void => {
@@ -19,6 +20,9 @@ export const registerRoutes = (app: Express, runtime: HttpRuntime): void => {
   }
 
   const auth = makeAuthMiddleware(runtime);
+
+  app.get('/status', auth, makeStatusHandler(runtime));
+  logger.info('Registered route: GET /status', { authRequired: config.securityEnabled });
 
   app.get('/file-meta', auth, makeFileMetaHandler(runtime));
   logger.info('Registered route: GET /file-meta', { authRequired: config.securityEnabled });

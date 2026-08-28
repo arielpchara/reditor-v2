@@ -41,6 +41,16 @@ describe('App', () => {
       vi.fn((url: string) => {
         if (url === '/health') return jsonRes({ status: 'ok', securityEnabled: false });
         if (url === '/file-meta') return jsonRes({ filename: 'app.ts' });
+        if (url === '/status') {
+          return jsonRes({
+            status: 'ok',
+            host: 'localhost',
+            port: 3000,
+            directory: '/tmp',
+            useTls: true,
+            securityEnabled: false,
+          });
+        }
         if (url === '/file') return textRes('hello world');
         return jsonRes({}, 404);
       }),
@@ -50,6 +60,8 @@ describe('App', () => {
     expect(screen.getByText(/loading/i)).toBeInTheDocument();
     await waitFor(() => expect(screen.getByText('app.ts')).toBeInTheDocument());
     expect(screen.getByLabelText('editor')).toHaveValue('hello world');
+    expect(screen.getByRole('status', { name: /serve status/i })).toBeInTheDocument();
+    expect(screen.getByText('/tmp')).toBeInTheDocument();
   });
 
   it('shows the OTP dialog when security is enabled and no token is stored', async () => {
@@ -86,6 +98,16 @@ describe('App', () => {
     const fetchFn = vi.fn((url: string, init?: RequestInit) => {
       if (url === '/health') return jsonRes({ status: 'ok', securityEnabled: false });
       if (url === '/file-meta') return jsonRes({ filename: 'app.ts' });
+      if (url === '/status') {
+        return jsonRes({
+          status: 'ok',
+          host: 'localhost',
+          port: 3000,
+          directory: '/tmp',
+          useTls: true,
+          securityEnabled: false,
+        });
+      }
       if (url === '/file' && init?.method === 'PUT') return emptyRes(204);
       if (url === '/file') return textRes('hello');
       return jsonRes({}, 404);

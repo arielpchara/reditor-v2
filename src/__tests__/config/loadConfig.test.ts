@@ -16,6 +16,10 @@ describe('loadConfig', () => {
     expect(loadConfig().useTls).toBe(true);
   });
 
+  it('disables OTP by default', () => {
+    expect(loadConfig().securityEnabled).toBe(false);
+  });
+
   it('honors USE_TLS=false independently of securityEnabled', () => {
     process.env.USE_TLS = 'false';
     const cfg = loadConfig({ securityEnabled: true });

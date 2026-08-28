@@ -1,0 +1,15 @@
+services:
+  serve:
+    build: .
+    volumes:
+      - ./demo:/work
+    ports:
+      - "127.0.0.1:2222:22"
+    command:
+      - serve
+      - /work/config.yaml
+      - --host
+      - 127.0.0.1
+      - --create
+    environment:
+      HOST: 127.0.0.1

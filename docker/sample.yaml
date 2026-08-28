@@ -1,0 +1,9 @@
+app:
+  name: reditor-demo
+  listen: 127.0.0.1
+  port: 3000
+
+features:
+  - browser editor
+  - otp
+  - tunnel

@@ -1,9 +1,7 @@
 "use strict";
-var __create = Object.create;
 var __defProp = Object.defineProperty;
 var __getOwnPropDesc = Object.getOwnPropertyDescriptor;
 var __getOwnPropNames = Object.getOwnPropertyNames;
-var __getProtoOf = Object.getPrototypeOf;
 var __hasOwnProp = Object.prototype.hasOwnProperty;
 var __export = (target, all) => {
   for (var name in all)
@@ -17,20 +15,15 @@ var __copyProps = (to, from, except, desc) => {
   }
   return to;
 };
-var __toESM = (mod, isNodeMode, target) => (target = mod != null ? __create(__getProtoOf(mod)) : {}, __copyProps(
-  // If the importer is in node compatibility mode or this is not an ESM
-  // file that has been converted to a CommonJS file using a Babel-
-  // compatible transform (i.e. "__esModule" has not been set), then set
-  // "default" to the CommonJS "module.exports" for node compatibility.
-  isNodeMode || !mod || !mod.__esModule ? __defProp(target, "default", { value: mod, enumerable: true }) : target,
-  mod
-));
 var __toCommonJS = (mod) => __copyProps(__defProp({}, "__esModule", { value: true }), mod);
 
 // src/index.ts
 var index_exports = {};
 __export(index_exports, {
+  buildSshArgs: () => buildSshArgs,
   generateOtp: () => generateOtp,
+  isValidPort: () => isValidPort,
+  isValidTarget: () => isValidTarget,
   loadConfig: () => loadConfig
 });
 module.exports = __toCommonJS(index_exports);
@@ -39,13 +32,12 @@ module.exports = __toCommonJS(index_exports);
 var loadConfig = (overrides = {}) => ({
   port: overrides.port ?? Number(process.env.PORT ?? 3e3),
   host: overrides.host ?? process.env.HOST ?? "localhost",
-  securityEnabled: overrides.securityEnabled ?? true,
-  useTls: overrides.securityEnabled ?? process.env.USE_TLS !== "false",
+  securityEnabled: overrides.securityEnabled ?? false,
+  useTls: overrides.useTls ?? process.env.USE_TLS !== "false",
   certPath: process.env.CERT_PATH,
   keyPath: process.env.KEY_PATH,
   otp: overrides.otp,
   tokenTtl: overrides.tokenTtl ?? 300,
-  keysDir: overrides.keysDir ?? ".reditor/keys",
   jwtPrivateKey: overrides.jwtPrivateKey,
   jwtPublicKey: overrides.jwtPublicKey,
   file: overrides.file ?? ""
@@ -53,12 +45,46 @@ var loadConfig = (overrides = {}) => ({
 
 // src/core/security/otp.ts
 var import_crypto = require("crypto");
-var generateOtp = () => String((0, import_crypto.randomInt)(1e5, 999999));
+var generateOtp = () => String((0, import_crypto.randomInt)(1e5, 1e6));
 
-// src/core/security/jwt.ts
-var import_jsonwebtoken = __toESM(require("jsonwebtoken"));
+// src/core/tunnel/buildSshArgs.ts
+var buildSshArgs = (request) => {
+  const args = [
+    "-N",
+    "-L",
+    `${request.localPort}:${request.remoteHost}:${request.remotePort}`
+  ];
+  if (request.sshPort !== void 0) {
+    args.push("-p", String(request.sshPort));
+  }
+  if (request.identity !== void 0) {
+    args.push("-i", request.identity, "-o", "IdentitiesOnly=yes");
+  }
+  args.push(
+    "-o",
+    "ExitOnForwardFailure=yes",
+    "-o",
+    "StrictHostKeyChecking=accept-new",
+    "-o",
+    "ServerAliveInterval=30",
+    "-o",
+    "ServerAliveCountMax=3",
+    request.target
+  );
+  return args;
+};
+
+// src/core/tunnel/validator.ts
+var isValidPort = (value) => Number.isInteger(value) && value >= 1 && value <= 65535;
+var isValidTarget = (target) => {
+  const trimmed = target.trim();
+  return trimmed.length > 0 && !trimmed.startsWith("-");
+};
 // Annotate the CommonJS export names for ESM import in node:
 0 && (module.exports = {
+  buildSshArgs,
   generateOtp,
+  isValidPort,
+  isValidTarget,
   loadConfig
 });
