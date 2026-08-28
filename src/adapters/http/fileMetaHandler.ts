@@ -1,4 +1,3 @@
-import fs from 'fs';
 import path from 'path';
 import { Request, Response } from 'express';
 import { HttpRuntime, RouteHandler } from './types';
@@ -39,34 +38,13 @@ const getMimeType = (filepath: string): string => {
   return MIME_MAP[ext] ?? 'text/plain';
 };
 
-const detectShebang = (filepath: string): boolean => {
-  try {
-    const fd = fs.openSync(filepath, 'r');
-    const buf = Buffer.alloc(2);
-    const bytesRead = fs.readSync(fd, buf, 0, 2, 0);
-    fs.closeSync(fd);
-    return bytesRead === 2 && buf[0] === 0x23 && buf[1] === 0x21; // '#!'
-  } catch {
-    return false;
-  }
-};
-
-export const makeFileMetaHandler = ({ config, logger }: HttpRuntime): RouteHandler => {
+export const makeFileMetaHandler = ({ config, logger, files }: HttpRuntime): RouteHandler => {
   return (_req: Request, res: Response): void => {
-    const fullpath = path.resolve(config.file);
-    const filename = path.basename(fullpath);
+    const filename = path.basename(config.file);
+    const { sizeBytes, hasShebang } = files.meta(config.file);
+    const type = getMimeType(config.file);
 
-    let size = 0;
-    try {
-      size = fs.statSync(fullpath).size;
-    } catch {
-      // file might not exist yet
-    }
-
-    const type = getMimeType(fullpath);
-    const hasShebang = detectShebang(fullpath);
-
-    logger.debug('Served file metadata', { filename, fullpath, size, type, hasShebang });
-    res.json({ filename, fullpath, size, type, hasShebang });
+    logger.debug('Served file metadata', { filename, size: sizeBytes, type, hasShebang });
+    res.json({ filename, size: sizeBytes, type, hasShebang });
   };
 };

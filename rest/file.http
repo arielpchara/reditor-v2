@@ -15,13 +15,13 @@
 @token = <paste JWT token here>
 
 ### GET /file-meta — filename info (no security)
-# Expected: 200 { "filename": "file.ts", "fullpath": "/abs/path/to/file.ts", "size": 1234, "type": "text/typescript", "hasShebang": false }
+# Expected: 200 { "filename": "file.ts", "size": 1234, "type": "text/typescript", "hasShebang": false }
 GET {{baseUrl}}/file-meta
 
 ###
 
 ### GET /file-meta — with JWT (security enabled)
-# Expected: 200 { "filename": "file.ts", "fullpath": "/abs/path/to/file.ts", "size": 1234, "type": "text/typescript", "hasShebang": false }
+# Expected: 200 { "filename": "file.ts", "size": 1234, "type": "text/typescript", "hasShebang": false }
 GET {{baseUrl}}/file-meta
 Authorization: Bearer {{token}}
 

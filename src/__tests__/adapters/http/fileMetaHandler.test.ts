@@ -32,13 +32,13 @@ const buildApp = (config: AppConfig): express.Express => {
 };
 
 describe('makeFileMetaHandler', () => {
-  it('returns filename, fullpath, size, type, hasShebang for a plain file', async () => {
+  it('returns filename, size, type, hasShebang for a plain file', async () => {
     const content = 'const x = 1;\n';
     const filePath = write('config.ts', content);
     const res = await request(buildApp(buildConfig(filePath))).get('/file-meta');
     expect(res.status).toBe(200);
     expect(res.body.filename).toBe('config.ts');
-    expect(res.body.fullpath).toBe(path.resolve(filePath));
+    expect(res.body.fullpath).toBeUndefined();
     expect(res.body.size).toBe(Buffer.byteLength(content));
     expect(res.body.type).toBe('text/typescript');
     expect(res.body.hasShebang).toBe(false);

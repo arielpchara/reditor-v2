@@ -6,48 +6,11 @@ import { Toolbar } from '../Toolbar';
 import { Toast, ToastKind } from '../Toast';
 import { HistoryDrawer, ContentVersion, hashContent } from '../HistoryDrawer';
 import { clearSessionToken, getSessionToken } from '../../otpApi';
+import { detectLanguage } from '../../detectLanguage';
+import { fetchWithAuth } from '../../fileApi';
 
 type ToastState = { message: string; kind: ToastKind; key: number } | null;
 type LoadPhase = 'loading' | 'auth' | 'ready' | 'error';
-
-const EXT_TO_LANG: Record<string, string> = {
-  ts: 'typescript',
-  tsx: 'tsx',
-  js: 'javascript',
-  jsx: 'jsx',
-  mjs: 'javascript',
-  cjs: 'javascript',
-  json: 'json',
-  html: 'html',
-  xml: 'xml',
-  svg: 'xml',
-  css: 'css',
-  scss: 'css',
-  sh: 'bash',
-  bash: 'bash',
-  zsh: 'bash',
-  yml: 'yaml',
-  yaml: 'yaml',
-  md: 'markdown',
-  mdx: 'markdown',
-  py: 'python',
-  rs: 'rust',
-  go: 'go',
-  sql: 'sql',
-};
-
-const detectLanguage = (filename: string): string => {
-  const ext = filename.split('.').pop()?.toLowerCase() ?? '';
-  return EXT_TO_LANG[ext] ?? 'plaintext';
-};
-
-const getAuthHeader = (): Record<string, string> => {
-  const token = getSessionToken();
-  return token ? { Authorization: `Bearer ${token}` } : {};
-};
-
-const fetchWithAuth = (url: string, init: RequestInit = {}): Promise<Response> =>
-  fetch(url, { ...init, headers: { ...getAuthHeader(), ...(init.headers ?? {}) } });
 
 export function App(): JSX.Element {
   const [phase, setPhase] = useState<LoadPhase>('loading');
@@ -80,8 +43,8 @@ export function App(): JSX.Element {
       setPhase('error');
       return;
     }
-    const meta = (await metaRes.json()) as { filename: string; fullpath: string };
-    setFilename(meta.fullpath);
+    const meta = (await metaRes.json()) as { filename: string };
+    setFilename(meta.filename);
     setLanguage(detectLanguage(meta.filename));
     document.title = `Reditor — ${meta.filename}`;
 
@@ -200,6 +163,7 @@ export function App(): JSX.Element {
   const handleRestore = useCallback((content: string): void => {
     setEditorContent(content);
     setIsDirty(content !== savedContentRef.current);
+    setCurrentHash(hashContent(content));
     setHistoryOpen(false);
   }, []);
 

@@ -2,7 +2,6 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import {
   exchangeToken,
   MAX_OTP_ATTEMPTS,
-  OtpFatalError,
   storeSessionToken,
   clearSessionToken,
   getSessionToken,
@@ -137,16 +136,8 @@ describe('session token storage', () => {
   });
 });
 
-describe('OtpFatalError', () => {
-  it('is an instance of Error', () => {
-    expect(new OtpFatalError()).toBeInstanceOf(Error);
-  });
-
-  it('has the expected name', () => {
-    expect(new OtpFatalError().name).toBe('OtpFatalError');
-  });
-
-  it('MAX_OTP_ATTEMPTS is 3', () => {
+describe('MAX_OTP_ATTEMPTS', () => {
+  it('is 3', () => {
     expect(MAX_OTP_ATTEMPTS).toBe(3);
   });
 });

@@ -7,13 +7,15 @@ import { AppConfig } from '../../config/types';
 import { registerRoutes } from './routes';
 import { createStaticHandler } from './staticHandler';
 import { HttpRuntime } from './types';
+import { securityHeaders } from './securityHeaders';
+import { makeErrorHandler } from './errorHandler';
 
 export const createApp = (runtime: HttpRuntime): express.Express => {
   const { config, logger } = runtime;
   logger.info('Initialising Express app', { useTls: config.useTls, file: config.file });
   const app = express();
   app.use(express.json({ limit: '1mb' }));
-  app.use(createStaticHandler(logger));
+  app.use(securityHeaders);
 
   app.use((req, _res, next) => {
     logger.info('Incoming request', { method: req.method, path: req.path, ip: req.ip });
@@ -21,6 +23,8 @@ export const createApp = (runtime: HttpRuntime): express.Express => {
   });
 
   registerRoutes(app, runtime);
+  app.use(createStaticHandler(logger));
+  app.use(makeErrorHandler(logger));
   return app;
 };
 

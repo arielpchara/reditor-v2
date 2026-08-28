@@ -3,13 +3,6 @@ export const MAX_OTP_ATTEMPTS = 3;
 const TOKEN_KEY = 'reditor_token';
 const EXPIRES_AT_KEY = 'reditor_token_expires_at';
 
-export class OtpFatalError extends Error {
-  constructor() {
-    super('Maximum OTP attempts reached — session terminated');
-    this.name = 'OtpFatalError';
-  }
-}
-
 export type OtpExchangeResult =
   | { ok: true; token: string; expiresIn: number }
   | { ok: false; error: string; shutdown: boolean };

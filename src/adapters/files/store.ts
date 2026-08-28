@@ -3,10 +3,12 @@ import { readFile } from './reader';
 import { writeFile } from './writer';
 import { createFile } from './creator';
 import { validateFile } from './validate';
+import { readFileMeta } from './meta';
 
 export const createFileStore = (): FileStore => ({
   read: readFile,
   write: writeFile,
   create: createFile,
   validate: validateFile,
+  meta: readFileMeta,
 });

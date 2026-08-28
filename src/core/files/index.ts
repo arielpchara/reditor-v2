@@ -9,5 +9,6 @@ export type {
   FileWriteResult,
   FileCreateError,
   FileCreateResult,
+  FileMetaInfo,
   FileStore,
 } from './types';

@@ -139,7 +139,7 @@ Returns metadata about the configured file. Used by the browser UI to set the ed
 
 ```bash
 curl https://localhost:3000/file-meta
-# → {"filename":"server.conf"}
+# → {"filename":"server.conf","size":1234,"type":"text/plain","hasShebang":false}
 ```
 
 **Errors:** `401` when security is enabled and the token is missing or invalid.

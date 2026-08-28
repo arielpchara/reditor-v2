@@ -40,7 +40,7 @@ describe('App', () => {
       'fetch',
       vi.fn((url: string) => {
         if (url === '/health') return jsonRes({ status: 'ok', securityEnabled: false });
-        if (url === '/file-meta') return jsonRes({ filename: 'app.ts', fullpath: '/tmp/app.ts' });
+        if (url === '/file-meta') return jsonRes({ filename: 'app.ts' });
         if (url === '/file') return textRes('hello world');
         return jsonRes({}, 404);
       }),
@@ -48,7 +48,7 @@ describe('App', () => {
 
     render(<App />);
     expect(screen.getByText(/loading/i)).toBeInTheDocument();
-    await waitFor(() => expect(screen.getByText('/tmp/app.ts')).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText('app.ts')).toBeInTheDocument());
     expect(screen.getByLabelText('editor')).toHaveValue('hello world');
   });
 
@@ -85,7 +85,7 @@ describe('App', () => {
   it('saves editor content with PUT /file', async () => {
     const fetchFn = vi.fn((url: string, init?: RequestInit) => {
       if (url === '/health') return jsonRes({ status: 'ok', securityEnabled: false });
-      if (url === '/file-meta') return jsonRes({ filename: 'app.ts', fullpath: '/tmp/app.ts' });
+      if (url === '/file-meta') return jsonRes({ filename: 'app.ts' });
       if (url === '/file' && init?.method === 'PUT') return emptyRes(204);
       if (url === '/file') return textRes('hello');
       return jsonRes({}, 404);
