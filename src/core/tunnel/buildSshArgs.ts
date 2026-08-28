@@ -11,9 +11,14 @@ export const buildSshArgs = (request: TunnelRequest): string[] => {
   if (request.sshPort !== undefined) {
     args.push('-p', String(request.sshPort));
   }
+  if (request.identity !== undefined) {
+    args.push('-i', request.identity, '-o', 'IdentitiesOnly=yes');
+  }
   args.push(
     '-o',
     'ExitOnForwardFailure=yes',
+    '-o',
+    'StrictHostKeyChecking=accept-new',
     '-o',
     'ServerAliveInterval=30',
     '-o',

@@ -94,10 +94,10 @@ docker compose up --build
 OTP prints in the compose logs. On your laptop:
 
 ```bash
-npx reditor tunnel demo@127.0.0.1 --port=8080 --ssh-port 2222
+npx reditor tunnel demo@127.0.0.1 --port=8080 --ssh-port 2222 -i demo/.ssh/id_ed25519
 ```
 
-Password is `demo` (demo only). Open `https://localhost:8080`. Edits land in `./demo` on the host.
+The compose entrypoint writes `demo/.ssh/id_ed25519` on first boot. Open `https://localhost:8080`. Edits land in `./demo` on the host.
 
 ## Features
 
@@ -144,6 +144,7 @@ npx reditor tunnel <user@host> [--port 8080]
 | `-p, --port <port>` | `8080` | Local port — open `https://localhost:<port>` |
 | `--remote-port <port>` | `3000` | Port `serve` is using on the server |
 | `--ssh-port <port>` | `22` | SSH port on the target host |
+| `-i, --identity <file>` | — | SSH private key |
 
 Opens `ssh -N -L` and stays up until you hit Ctrl+C. Stopping `serve` does not close the tunnel — start another file and reuse it.
 

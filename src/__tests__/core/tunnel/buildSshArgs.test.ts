@@ -52,4 +52,16 @@ describe('buildSshArgs', () => {
     expect(idx).toBeGreaterThan(0);
     expect(args[idx + 1]).toBe('2222');
   });
+
+  it('accepts new host keys without disabling later verification', () => {
+    expect(buildSshArgs(request())).toContain('StrictHostKeyChecking=accept-new');
+  });
+
+  it('passes -i when identity is set', () => {
+    const args = buildSshArgs(request({ identity: 'demo/.ssh/id_ed25519' }));
+    const idx = args.indexOf('-i');
+    expect(idx).toBeGreaterThan(0);
+    expect(args[idx + 1]).toBe('demo/.ssh/id_ed25519');
+    expect(args).toContain('IdentitiesOnly=yes');
+  });
 });

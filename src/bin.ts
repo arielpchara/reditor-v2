@@ -51,11 +51,14 @@ const runTunnel = async (parsed: ParsedTunnelCommand): Promise<void> => {
   );
   process.stdout.write('\n');
 
+  const identity = parsed.opts.identity;
+
   logger.info('Opening SSH tunnel', {
     target: rawTarget,
     localPort,
     remotePort,
     sshPort,
+    identity,
     remoteHost: DEFAULT_TUNNEL_REMOTE_HOST,
   });
 
@@ -66,6 +69,7 @@ const runTunnel = async (parsed: ParsedTunnelCommand): Promise<void> => {
     remotePort,
     remoteHost: DEFAULT_TUNNEL_REMOTE_HOST,
     sshPort,
+    identity,
   });
 
   const stop = (): void => {
