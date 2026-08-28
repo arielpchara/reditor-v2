@@ -146,7 +146,7 @@ npx reditor tunnel <user@host> [--port 8080]
 | `--ssh-port <port>` | `22` | SSH port on the target host |
 | `-i, --identity <file>` | — | SSH private key |
 
-Opens `ssh -N -L` and stays up until you hit Ctrl+C. Stopping `serve` does not close the tunnel — start another file and reuse it.
+Opens `ssh -N -L` and stays up until you hit Ctrl+C. If SSH drops, it logs a warning and retries every 10 seconds. Stopping `serve` does not close the tunnel — start another file and reuse it.
 
 Needs `ssh` on your PATH. Auth uses your existing SSH config and keys.
 

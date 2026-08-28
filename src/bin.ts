@@ -62,7 +62,7 @@ const runTunnel = async (parsed: ParsedTunnelCommand): Promise<void> => {
     remoteHost: DEFAULT_TUNNEL_REMOTE_HOST,
   });
 
-  const tunnels = createSshTunnelOpener();
+  const tunnels = createSshTunnelOpener({ logger });
   const session = tunnels.open({
     target: rawTarget,
     localPort,
