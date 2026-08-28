@@ -3,15 +3,18 @@
 ## Purpose
 
 Maintain two things in the repository:
+
 1. **`ai-sessions.json`** — a machine-readable log of every AI session
-2. **The AI & Copilot Usage section in `README.md`** — a human-readable summary
-   with disclosure, metrics, and per-area authorship status
+2. **A short AI disclaimer in `README.md`** — one paragraph, then a link to [REVIEW.md](../REVIEW.md)
+
+The product README is a landing page. Session metrics, token counts, and authorship tables do **not** belong there. Put the narrative in `REVIEW.md` and the structured log in `ai-sessions.json`.
 
 ---
 
 ## When to activate this skill
 
 Activate at the **end of every AI session** (before the final commit), or when:
+
 - A new AI session starts and the previous one wasn't logged
 - The LLM being used changes mid-session
 - A human reviewer asks for an up-to-date usage report
@@ -60,65 +63,35 @@ Append a new entry to the sessions array:
 ### Step 3 — Compute cumulative stats
 
 From `ai-sessions.json` calculate:
+
 - **Total sessions** — count of entries
 - **Total duration** — sum of all `duration_minutes`
 - **Total commits** — count of all commits across all sessions
 - **Models used** — unique list of `llm` values
 - **Total tokens** — sum of known tokens; note "partial" if any sessions have `null`
 
-### Step 4 — Update the README section
+Keep these numbers in `ai-sessions.json` (and optionally `REVIEW.md`). Do not paste them into `README.md`.
 
-Replace the full **⚠️ AI & Copilot Usage** section with this template:
+### Step 4 — Keep the README disclaimer short
+
+The **Built with AI** section in `README.md` must stay this shape. Do not grow it.
 
 ```markdown
-## ⚠️ AI & Copilot Usage
+## Built with AI
 
-This project was built with the assistance of **GitHub Copilot** and other AI tools.
+This project was built with AI assistance. Treat the code like any other open-source dependency — review it before you rely on it.
 
-> **Disclaimer:** AI-generated content may contain errors, security vulnerabilities,
-> incorrect logic, or outdated practices. All code, configuration, and documentation
-> in this repository should be reviewed and validated by a qualified human developer
-> before being used in any production environment.
-
-### AI Session Summary
-
-| Metric | Value |
-|---|---|
-| Total AI sessions | N |
-| Total AI time | Xh Ym |
-| AI commits | N |
-| Models used | list |
-| Tokens (input / output) | X / Y — or "Not available from this interface" |
-| Last session | YYYY-MM-DD |
-
-### Session Log
-
-| Date | Model | Duration | Commits | Summary |
-|---|---|---|---|---|
-| YYYY-MM-DD | model | Xm | N | summary |
-
-### Codebase Authorship
-
-| Area | Status |
-|---|---|
-| ... | 🤖 / 👤 / 🔀 / ✅ |
-
-### Status icons
-
-| Icon | Meaning |
-|---|---|
-| 🤖 AI-generated | Written entirely by an AI agent |
-| 👤 Human-written | Written entirely by a human |
-| 🔀 Mixed | Combination of AI and human authorship |
-| ✅ Human-reviewed | AI-generated but reviewed and approved by a human |
+The rebuild story lives in [REVIEW.md](./REVIEW.md).
 ```
+
+If `REVIEW.md` needs a longer session log, update that file instead.
 
 ---
 
 ## Quality rules
 
-- Never remove this section once added
-- Keep the disclaimer verbatim — never soften it
+- Never restore the old **AI & Copilot Usage** metrics / session table into `README.md`
+- Never remove the short **Built with AI** section from `README.md`
 - Token counts: always be honest — `null` is better than a guess
-- Update authorship table on every significant AI contribution
-- `ai-sessions.json` is the source of truth — README is derived from it
+- `ai-sessions.json` is the source of truth for metrics
+- `README.md` only discloses that AI was used, then points at `REVIEW.md`
