@@ -4,17 +4,17 @@
 
 @host = localhost
 @port = 3000
-@baseUrl = https://{{host}}:{{port}}
+@baseUrl = http://{{host}}:{{port}}
 @token = <paste JWT token here after calling /auth/exchange-token>
 
 ### Serve status — no security
-# Expected: 200 {"status":"ok","host":"localhost","port":3000,"directory":"...","useTls":true,"securityEnabled":false}
+# Expected: 200 {"status":"ok","host":"localhost","port":3000,"directory":"...","useTls":false,"securityEnabled":false}
 GET {{baseUrl}}/status
 
 ###
 
 ### Serve status — with JWT (security enabled)
-# Expected: 200 {"status":"ok","host":"localhost","port":3000,"directory":"...","useTls":true,"securityEnabled":true}
+# Expected: 200 {"status":"ok","host":"localhost","port":3000,"directory":"...","useTls":false,"securityEnabled":true}
 GET {{baseUrl}}/status
 Authorization: Bearer {{token}}
 

@@ -3,12 +3,19 @@ import { parseCli, ParsedServeCommand, ParsedTunnelCommand } from './adapters/cl
 import { startServer } from './adapters/http';
 import { generateOtp } from './core/security';
 import { DEFAULT_TUNNEL_REMOTE_HOST, isValidPort, isValidTarget } from './core/tunnel';
+import {
+  buildEditorUrl,
+  buildHealthUrl,
+  DEFAULT_BROWSER_POLL_MS,
+  waitUntilReady,
+} from './core/browser';
 import { loadConfig } from './config';
 import { logger, logFilePath } from './adapters/logger';
 import { createFileStore } from './adapters/files';
 import { generateKeyPair, createTokenService } from './adapters/security';
 import { promptCreateFile } from './adapters/cli/promptCreate';
 import { createSshTunnelOpener } from './adapters/tunnel';
+import { createBrowserOpener, probeHealth } from './adapters/browser';
 
 const LOOPBACK_HOSTS = new Set(['localhost', '127.0.0.1', '::1']);
 
@@ -40,15 +47,19 @@ const runTunnel = async (parsed: ParsedTunnelCommand): Promise<void> => {
     }
   }
 
+  const useTls = parsed.opts.https;
+  const editorUrl = buildEditorUrl(localPort, useTls);
+
   process.stdout.write('\n');
   process.stdout.write('  🚇 SSH tunnel\n');
-  process.stdout.write(`     https://localhost:${localPort}  →  ${rawTarget}:${remotePort}\n`);
+  process.stdout.write(`     ${editorUrl}  →  ${rawTarget}:${remotePort}\n`);
   if (sshPort !== undefined) {
     process.stdout.write(`     SSH port ${sshPort}\n`);
   }
   process.stdout.write(
     '     Leave this running. Restart serve on the server without resetting the tunnel.\n',
   );
+  process.stdout.write('     The editor opens in your browser when the tunnel is up.\n');
   process.stdout.write('\n');
 
   const identity = parsed.opts.identity;
@@ -59,6 +70,7 @@ const runTunnel = async (parsed: ParsedTunnelCommand): Promise<void> => {
     remotePort,
     sshPort,
     identity,
+    useTls,
     remoteHost: DEFAULT_TUNNEL_REMOTE_HOST,
   });
 
@@ -72,11 +84,35 @@ const runTunnel = async (parsed: ParsedTunnelCommand): Promise<void> => {
     identity,
   });
 
+  let stopped = false;
   const stop = (): void => {
+    stopped = true;
     session.close();
   };
   process.on('SIGINT', stop);
   process.on('SIGTERM', stop);
+
+  const browsers = createBrowserOpener({ logger });
+  void waitUntilReady(
+    () => probeHealth(buildHealthUrl(localPort, useTls)),
+    (ms) =>
+      new Promise((resolve) => {
+        setTimeout(resolve, ms);
+      }),
+    DEFAULT_BROWSER_POLL_MS,
+    () => stopped,
+  )
+    .then((ready) => {
+      if (!ready) {
+        return;
+      }
+      browsers.open(editorUrl);
+      process.stdout.write(`     Opened ${editorUrl}\n`);
+    })
+    .catch((err: unknown) => {
+      const error = err instanceof Error ? err : new Error(String(err));
+      logger.warn('Failed while waiting to open browser', { error: error.message });
+    });
 
   try {
     const code = await session.wait();
@@ -213,6 +249,7 @@ const runServe = async (parsed: ParsedServeCommand): Promise<void> => {
   const config = loadConfig({
     port,
     host: opts.host,
+    useTls: opts.https ? true : undefined,
     securityEnabled,
     otp,
     tokenTtl,

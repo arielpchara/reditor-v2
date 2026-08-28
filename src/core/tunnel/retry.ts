@@ -1,1 +1,1 @@
-export const DEFAULT_TUNNEL_RETRY_MS = 10_000;
+export const DEFAULT_TUNNEL_RETRY_MS = 1_000;

@@ -20,6 +20,9 @@ var __toCommonJS = (mod) => __copyProps(__defProp({}, "__esModule", { value: tru
 // src/index.ts
 var index_exports = {};
 __export(index_exports, {
+  buildEditorUrl: () => buildEditorUrl,
+  buildHealthUrl: () => buildHealthUrl,
+  buildOpenUrlCommand: () => buildOpenUrlCommand,
   buildSshArgs: () => buildSshArgs,
   generateOtp: () => generateOtp,
   isValidPort: () => isValidPort,
@@ -33,7 +36,7 @@ var loadConfig = (overrides = {}) => ({
   port: overrides.port ?? Number(process.env.PORT ?? 3e3),
   host: overrides.host ?? process.env.HOST ?? "localhost",
   securityEnabled: overrides.securityEnabled ?? false,
-  useTls: overrides.useTls ?? process.env.USE_TLS !== "false",
+  useTls: overrides.useTls ?? process.env.USE_TLS === "true",
   certPath: process.env.CERT_PATH,
   keyPath: process.env.KEY_PATH,
   otp: overrides.otp,
@@ -80,8 +83,26 @@ var isValidTarget = (target) => {
   const trimmed = target.trim();
   return trimmed.length > 0 && !trimmed.startsWith("-");
 };
+
+// src/core/browser/url.ts
+var buildEditorUrl = (port, useTls) => `${useTls ? "https" : "http"}://localhost:${port}`;
+var buildHealthUrl = (port, useTls) => `${useTls ? "https" : "http"}://127.0.0.1:${port}/health`;
+
+// src/core/browser/openCommand.ts
+var buildOpenUrlCommand = (url, platform) => {
+  if (platform === "darwin") {
+    return { command: "open", args: [url] };
+  }
+  if (platform === "win32") {
+    return { command: "cmd", args: ["/c", "start", "", url] };
+  }
+  return { command: "xdg-open", args: [url] };
+};
 // Annotate the CommonJS export names for ESM import in node:
 0 && (module.exports = {
+  buildEditorUrl,
+  buildHealthUrl,
+  buildOpenUrlCommand,
   buildSshArgs,
   generateOtp,
   isValidPort,

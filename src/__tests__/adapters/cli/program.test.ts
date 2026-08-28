@@ -21,6 +21,12 @@ describe('parseServeCommand', () => {
     expect(opts.enableSecurity).toBe(false);
     expect(opts.tokenTtl).toBe('300');
     expect(opts.forceOtp).toBeUndefined();
+    expect(opts.https).toBe(false);
+  });
+
+  it('parses --https as true', () => {
+    const { opts } = parseServeCommand(argv('myfile.ts', '--https'));
+    expect(opts.https).toBe(true);
   });
 
   it('parses --port', () => {
@@ -93,6 +99,15 @@ describe('parseCli', () => {
     expect(parsed.opts.remotePort).toBe('3000');
     expect(parsed.opts.sshPort).toBeUndefined();
     expect(parsed.opts.identity).toBeUndefined();
+    expect(parsed.opts.https).toBe(false);
+  });
+
+  it('parses tunnel --https', () => {
+    const parsed = parseCli(tunnelArgv('user@box', '--https'));
+    if (parsed.command !== 'tunnel') {
+      throw new Error('expected tunnel');
+    }
+    expect(parsed.opts.https).toBe(true);
   });
 
   it('parses -i identity', () => {

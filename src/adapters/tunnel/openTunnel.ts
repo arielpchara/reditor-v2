@@ -38,9 +38,12 @@ export const openSshTunnel = (request: TunnelRequest, deps: TunnelOpenerDeps): T
   let stopped = false;
   let attempt = 0;
   let exitCode = 0;
+  let interruptDelay: (() => void) | undefined;
 
   const close = (): void => {
     stopped = true;
+    interruptDelay?.();
+    interruptDelay = undefined;
     if (child && !child.killed) {
       child.kill('SIGTERM');
     }
@@ -103,7 +106,13 @@ export const openSshTunnel = (request: TunnelRequest, deps: TunnelOpenerDeps): T
         break;
       }
       logger.info('Retrying SSH tunnel', { nextAttempt: attempt + 1, delayMs: retryMs });
-      await delayFn(retryMs);
+      await Promise.race([
+        delayFn(retryMs),
+        new Promise<void>((resolve) => {
+          interruptDelay = resolve;
+        }),
+      ]);
+      interruptDelay = undefined;
     }
     return exitCode;
   };

@@ -11,31 +11,31 @@ describe('loadConfig', () => {
     }
   });
 
-  it('enables TLS by default', () => {
+  it('disables TLS by default', () => {
     delete process.env.USE_TLS;
-    expect(loadConfig().useTls).toBe(true);
+    expect(loadConfig().useTls).toBe(false);
   });
 
   it('disables OTP by default', () => {
     expect(loadConfig().securityEnabled).toBe(false);
   });
 
-  it('honors USE_TLS=false independently of securityEnabled', () => {
-    process.env.USE_TLS = 'false';
+  it('honors USE_TLS=true independently of securityEnabled', () => {
+    process.env.USE_TLS = 'true';
     const cfg = loadConfig({ securityEnabled: true });
     expect(cfg.securityEnabled).toBe(true);
-    expect(cfg.useTls).toBe(false);
+    expect(cfg.useTls).toBe(true);
   });
 
   it('allows an explicit useTls override', () => {
-    process.env.USE_TLS = 'false';
+    delete process.env.USE_TLS;
     expect(loadConfig({ useTls: true }).useTls).toBe(true);
   });
 
-  it('does not disable TLS when security is disabled', () => {
+  it('does not enable TLS when security is enabled', () => {
     delete process.env.USE_TLS;
-    const cfg = loadConfig({ securityEnabled: false });
-    expect(cfg.securityEnabled).toBe(false);
-    expect(cfg.useTls).toBe(true);
+    const cfg = loadConfig({ securityEnabled: true });
+    expect(cfg.securityEnabled).toBe(true);
+    expect(cfg.useTls).toBe(false);
   });
 });

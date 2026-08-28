@@ -24,7 +24,7 @@ Reusable agent skills live in `skills/`. Each skill is a self-contained instruct
 
 **reditor** — edit files from your server in the browser.
 
-A Node.js CLI tool that spins up a local HTTPS server and exposes a browser-based file editor. Run `npx reditor serve <file>` on the server and `npx reditor tunnel <user@host> --port=8080` on your laptop, then edit from the browser. OTP is off by default; pass `--enable-security` to require it.
+A Node.js CLI tool that spins up a local HTTP server and exposes a browser-based file editor. Run `npx reditor serve <file>` on the server and `npx reditor tunnel <user@host> --port=8080` on your laptop, then edit from the browser. OTP and HTTPS are off by default; pass `--enable-security` / `--https` to require them.
 
 ### Scenarios
 
@@ -46,14 +46,16 @@ src/
 │   ├── files/                   # File predicates, result types, FileStore port
 │   ├── security/                # OTP, JWT types, TokenService port
 │   ├── logging/                 # Logger port
-│   └── tunnel/                  # SSH tunnel types, ssh args, TunnelOpener port
+│   ├── tunnel/                  # SSH tunnel types, ssh args, TunnelOpener port
+│   └── browser/                 # editor URL, open-command, waitUntilReady
 ├── adapters/                    # Implementations that talk to the outside world
 │   ├── cli/                     # commander.js (program.ts, promptCreate.ts)
-│   ├── http/                    # Express HTTPS server + route handlers
+│   ├── http/                    # Express HTTP server + route handlers
 │   ├── files/                   # filesystem FileStore (read/write/create/validate)
 │   ├── security/                # jsonwebtoken + RSA key generation
 │   ├── logger/                  # winston Logger implementation
-│   └── tunnel/                  # ssh spawn (TunnelOpener)
+│   ├── tunnel/                  # ssh spawn (TunnelOpener)
+│   └── browser/                 # open default browser, health probe
 ├── config/                      # AppConfig + loadConfig()
 ├── bin.ts                       # Composition root (npx entry)
 └── index.ts                     # Public library API
@@ -81,7 +83,7 @@ HTTP handlers must not import `adapters/logger`, `adapters/files`, or `adapters/
 
 | Command | Description |
 |---|---|
-| `npm run dev` | Start HTTPS server with live reload (`--create .reditor/dev.txt`) |
+| `npm run dev` | Start HTTP server with live reload (`--create .reditor/dev.txt`) |
 | `npm run build` | Bundle CLI with esbuild → `dist/` |
 | `npm run build:web` | Build the React UI → `dist/web/` |
 | `npm run build:all` | Backend + web production build |
@@ -101,11 +103,10 @@ node dist/bin.js tunnel user@host --port 8080
 npx reditor serve ./settings.json --enable-security
 ```
 
-### Server (HTTPS)
+### Server (HTTP)
 
-- Default: `https://localhost:3000`
-- Self-signed cert generated automatically when `CERT_PATH`/`KEY_PATH` are unset
-- Set `USE_TLS=false` for plain HTTP (independent of OTP/JWT)
+- Default: `http://localhost:3000`
+- Pass `--https` (or `USE_TLS=true`) for TLS; self-signed cert generated when `CERT_PATH`/`KEY_PATH` are unset
 - Set `CERT_PATH` / `KEY_PATH` to use your own certs
 - Set `PORT` / `HOST` to override defaults (CLI flags take precedence)
 - Serves the built web UI at `/`

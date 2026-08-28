@@ -7,6 +7,7 @@ export type ServeOptions = {
   tokenTtl: string;
   forceOtp: string | undefined;
   create: boolean;
+  https: boolean;
 };
 
 export type TunnelOptions = {
@@ -14,6 +15,7 @@ export type TunnelOptions = {
   remotePort: string;
   sshPort: string | undefined;
   identity: string | undefined;
+  https: boolean;
 };
 
 export type ParsedServeCommand = {
@@ -37,6 +39,7 @@ const SERVE_DEFAULTS: ServeOptions = {
   tokenTtl: '300',
   forceOtp: undefined,
   create: false,
+  https: false,
 };
 
 const TUNNEL_DEFAULTS: TunnelOptions = {
@@ -44,6 +47,7 @@ const TUNNEL_DEFAULTS: TunnelOptions = {
   remotePort: '3000',
   sshPort: undefined,
   identity: undefined,
+  https: false,
 };
 
 export const buildProgram = (): Command => {
@@ -65,6 +69,7 @@ export const buildProgram = (): Command => {
     .option('--token-ttl <seconds>', 'JWT token time-to-live in seconds', '300')
     .option('--force-otp <otp>', '[TEST ONLY] Override the generated OTP with a fixed value')
     .option('--create', 'Create the file if it does not exist (skips confirmation prompt)', false)
+    .option('--https', 'Serve over HTTPS (off by default)', false)
     .action(() => {
       // action is handled in bin.ts to keep this file pure/testable
     });
@@ -77,6 +82,7 @@ export const buildProgram = (): Command => {
     .option('--remote-port <port>', 'Remote reditor serve port', '3000')
     .option('--ssh-port <port>', 'SSH port on the target host')
     .option('-i, --identity <file>', 'SSH private key')
+    .option('--https', 'Remote serve uses HTTPS (off by default)', false)
     .action(() => {
       // action is handled in bin.ts to keep this file pure/testable
     });

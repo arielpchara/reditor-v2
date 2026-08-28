@@ -119,6 +119,24 @@ describe('createSshTunnelOpener', () => {
     expect(delayFn).not.toHaveBeenCalled();
   });
 
+  it('stops immediately when closed during the retry delay', async () => {
+    const child = new FakeChild();
+    const spawnFn = jest.fn(asSpawn(child));
+    const delayFn = jest.fn(() => new Promise<void>(() => undefined));
+    const opener = createSshTunnelOpener({ logger: silentLogger(), spawnFn, delayFn });
+    const session = opener.open(request);
+    const waitPromise = session.wait();
+
+    await Promise.resolve();
+    child.emit('close', 255);
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect(delayFn).toHaveBeenCalled();
+    session.close();
+    await expect(waitPromise).resolves.toBe(0);
+  });
+
   it('kills the ssh process on close', async () => {
     const child = new FakeChild();
     const opener = createSshTunnelOpener({ logger: silentLogger(), spawnFn: asSpawn(child) });
