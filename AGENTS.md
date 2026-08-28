@@ -24,7 +24,7 @@ Reusable agent skills live in `skills/`. Each skill is a self-contained instruct
 
 **reditor** — edit files from your server in the browser.
 
-A Node.js CLI tool that spins up a local HTTPS server and exposes a browser-based file editor. Run `npx reditor serve <file>` on the server and `npx reditor tunnel <user@host> --port=8080` on your laptop, then edit from the browser, with OTP + JWT security enabled by default.
+A Node.js CLI tool that spins up a local HTTPS server and exposes a browser-based file editor. Run `npx reditor serve <file>` on the server and `npx reditor tunnel <user@host> --port=8080` on your laptop, then edit from the browser. OTP is off by default; pass `--enable-security` to require it.
 
 ### Scenarios
 
@@ -98,7 +98,7 @@ node dist/bin.js serve ./config.yaml
 node dist/bin.js serve ./app.conf --port 8080
 node dist/bin.js serve ./new.yaml --create
 node dist/bin.js tunnel user@host --port 8080
-npx reditor serve ./settings.json --force-disable-security
+npx reditor serve ./settings.json --enable-security
 ```
 
 ### Server (HTTPS)

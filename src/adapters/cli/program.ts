@@ -3,7 +3,7 @@ import { Command } from 'commander';
 export type ServeOptions = {
   port: string;
   host: string;
-  forceDisableSecurity: boolean;
+  enableSecurity: boolean;
   tokenTtl: string;
   forceOtp: string | undefined;
   create: boolean;
@@ -33,7 +33,7 @@ export type ParsedCli = ParsedServeCommand | ParsedTunnelCommand;
 const SERVE_DEFAULTS: ServeOptions = {
   port: '3000',
   host: 'localhost',
-  forceDisableSecurity: false,
+  enableSecurity: false,
   tokenTtl: '300',
   forceOtp: undefined,
   create: false,
@@ -58,8 +58,8 @@ export const buildProgram = (): Command => {
     .option('-p, --port <port>', 'Port to listen on', '3000')
     .option('-H, --host <host>', 'Host to bind to', 'localhost')
     .option(
-      '--force-disable-security',
-      '[DANGER] Disable OTP and JWT auth — anyone on the network can access the file',
+      '--enable-security',
+      'Require OTP and JWT (off by default; SSH tunnel is the auth)',
       false,
     )
     .option('--token-ttl <seconds>', 'JWT token time-to-live in seconds', '300')

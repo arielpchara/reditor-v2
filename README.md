@@ -15,7 +15,7 @@
 [![license](https://img.shields.io/badge/license-ISC-blue?style=flat-square)](#license)
 [![typescript](https://img.shields.io/badge/TypeScript-5-3178C6?style=flat-square)](https://www.typescriptlang.org)
 
-SSH into a box. Fight vim. Save a YAML file. Or serve the file on the box, tunnel from your laptop, and edit it in the browser — OTP in the terminal, HTTPS out of the box.
+SSH into a box. Fight vim. Save a YAML file. Or serve the file on the box, tunnel from your laptop, and edit it in the browser. No OTP. HTTPS out of the box.
 
 ```bash
 # On the server
@@ -33,7 +33,7 @@ $ npx reditor tunnel user@that-server --port=8080
      Leave this running. Restart serve on the server without resetting the tunnel.
 ```
 
-Open `https://localhost:8080`. Paste the OTP from the server terminal. Edit. Hit **⌘S** / **Ctrl+S**.
+Open `https://localhost:8080`. Edit. Hit **⌘S** / **Ctrl+S**.
 
 ---
 
@@ -41,14 +41,14 @@ Open `https://localhost:8080`. Paste the OTP from the server terminal. Edit. Hit
 
 Editing a config on a remote machine should not mean wrestling a shell editor over SSH. Reditor starts a localhost HTTPS editor on the server; from your laptop you open an SSH tunnel and edit in the browser. Aimed at DevOps engineers and anyone who needs to change a file on a box without cloning a repo or installing an IDE.
 
-Secure by default. Zero install. Keep `serve` bound to localhost — the tunnel is the recommended way in.
+SSH is the lock. Zero install. Keep `serve` bound to localhost — the tunnel is the recommended way in. OTP is opt-in.
 
 ## Quick start
 
 Requires [Node.js](https://nodejs.org) 18 or newer. **Recommended:** tunnel from your laptop so the editor stays on localhost on the server.
 
 ```bash
-# 1. On the server — OTP prints here
+# 1. On the server
 npx reditor serve ./config.yaml
 
 # 2. On your laptop — leave this open (survives serve restarts)
@@ -91,7 +91,7 @@ npx github:arielpchara/reditor-refactored tunnel user@that-server --port=8080
 docker compose up --build
 ```
 
-OTP prints in the compose logs. On your laptop:
+On your laptop:
 
 ```bash
 npx reditor tunnel demo@127.0.0.1 --port=8080 --ssh-port 2222 -i demo/.ssh/id_ed25519
@@ -105,8 +105,8 @@ The compose entrypoint writes `demo/.ssh/id_ed25519` on first boot. Open `https:
 - **Save from the browser** — one click or **⌘S** / **Ctrl+S**; the button stays off until the file is dirty
 - **Session history** — restore earlier saves from this run without leaving the page
 - **HTTPS** — self-signed cert generated automatically (or bring your own)
-- **OTP + JWT** — 6-digit code in the terminal, RS256 token in the browser
-- **3-strike lockout** — three bad OTPs and the process exits
+- **OTP + JWT (opt-in)** — `--enable-security` prints a 6-digit code; RS256 token in the browser
+- **3-strike lockout** — with OTP on, three bad attempts and the process exits
 - **SSH tunnel** — `reditor tunnel --port=8080` on your laptop; stays up when you stop and restart `serve`
 - **Fail-fast validation** — refuses directories, binary files, and anything over 512 KB
 - **Zero install** — `npx reditor serve <file>` / `npx reditor tunnel <target>`
@@ -125,8 +125,8 @@ npx reditor serve <file> [options]
 | `-p, --port <port>` | `3000` | Port the server listens on |
 | `-H, --host <host>` | `localhost` | Host the server binds to |
 | `--create` | `false` | Create the file if it does not exist |
-| `--token-ttl <seconds>` | `300` | JWT lifetime in seconds |
-| `--force-disable-security` | `false` | **Danger.** Turn off OTP and JWT |
+| `--token-ttl <seconds>` | `300` | JWT lifetime in seconds (with `--enable-security`) |
+| `--enable-security` | `false` | Require OTP + JWT |
 
 If `<file>` is missing, a directory, too large, or binary, Reditor prints an error and exits before opening a port.
 
@@ -152,7 +152,9 @@ Needs `ssh` on your PATH. Auth uses your existing SSH config and keys.
 
 ## Security
 
-OTP + JWT is **on by default**. Prefer `tunnel` from your laptop instead of binding `serve` to `0.0.0.0`. Use `--force-disable-security` only on an isolated, trusted network.
+OTP is **off by default**. Access is SSH: keep `serve` on localhost and `tunnel` from your laptop. Pass `--enable-security` if you bind `serve` without a tunnel.
+
+With `--enable-security`:
 
 1. An **RSA-2048** key pair is generated in memory. Restarting the server invalidates every JWT.
 2. A **6-digit OTP** is generated with `crypto.randomInt`.
@@ -160,7 +162,7 @@ OTP + JWT is **on by default**. Prefer `tunnel` from your laptop instead of bind
 4. Tokens are **RS256**, expiring after `--token-ttl` seconds.
 5. After **3 failed OTP attempts** the process exits. Binding off loopback prints a warning — that exit is a denial-of-service vector.
 
-TLS is separate from auth. Set `USE_TLS=false` for plain HTTP without turning off OTP/JWT.
+TLS is separate from auth. Set `USE_TLS=false` for plain HTTP.
 
 ## Configuration
 
@@ -176,11 +178,11 @@ Environment variables are optional. CLI flags win when both are set.
 
 ## HTTP API
 
-Auth is a `Authorization: Bearer <jwt>` header when security is on (the default).
+Auth is a `Authorization: Bearer <jwt>` header when `--enable-security` is on.
 
 | Method | Path | Auth | Purpose |
 |---|---|---|---|
-| `GET` | `/health` | no | `{ "status": "ok", "securityEnabled": true }` |
+| `GET` | `/health` | no | `{ "status": "ok", "securityEnabled": false }` |
 | `POST` | `/auth/exchange-token` | OTP body | `{ "otp": "482910" }` → JWT. Missing when security is off. 3 failures → process exit |
 | `GET` | `/file-meta` | JWT | Filename, size, type |
 | `GET` | `/file` | JWT | Raw file content |

@@ -18,7 +18,7 @@ describe('parseServeCommand', () => {
     const { opts } = parseServeCommand(argv('myfile.ts'));
     expect(opts.port).toBe('3000');
     expect(opts.host).toBe('localhost');
-    expect(opts.forceDisableSecurity).toBe(false);
+    expect(opts.enableSecurity).toBe(false);
     expect(opts.tokenTtl).toBe('300');
     expect(opts.forceOtp).toBeUndefined();
   });
@@ -38,14 +38,14 @@ describe('parseServeCommand', () => {
     expect(opts.host).toBe('0.0.0.0');
   });
 
-  it('parses --force-disable-security as true', () => {
-    const { opts } = parseServeCommand(argv('myfile.ts', '--force-disable-security'));
-    expect(opts.forceDisableSecurity).toBe(true);
+  it('parses --enable-security as true', () => {
+    const { opts } = parseServeCommand(argv('myfile.ts', '--enable-security'));
+    expect(opts.enableSecurity).toBe(true);
   });
 
-  it('defaults forceDisableSecurity to false when flag is absent', () => {
+  it('defaults enableSecurity to false when flag is absent', () => {
     const { opts } = parseServeCommand(argv('myfile.ts', '--port', '4000'));
-    expect(opts.forceDisableSecurity).toBe(false);
+    expect(opts.enableSecurity).toBe(false);
   });
 
   it('parses --token-ttl', () => {

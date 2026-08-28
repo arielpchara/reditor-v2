@@ -175,16 +175,28 @@ const runServe = async (parsed: ParsedServeCommand): Promise<void> => {
     process.exit(1);
   }
 
-  const securityEnabled = !opts.forceDisableSecurity;
+  const securityEnabled = opts.enableSecurity;
   const isForced = securityEnabled && opts.forceOtp !== undefined;
   const otp = securityEnabled ? (opts.forceOtp ?? generateOtp()) : undefined;
 
-  if (opts.forceDisableSecurity) {
-    logger.warn('--force-disable-security is active: OTP and JWT auth are DISABLED');
+  if (!securityEnabled) {
+    logger.info('OTP disabled (default); SSH tunnel is the recommended access path');
     process.stdout.write('\n');
-    process.stdout.write('  ⚠️  WARNING: Security is DISABLED via --force-disable-security\n');
-    process.stdout.write('     Anyone with network access to this server can read the file.\n');
-    process.stdout.write('     Never use this flag in production or on untrusted networks.\n');
+    process.stdout.write('  Open (no OTP)\n');
+    process.stdout.write(
+      '     Use `reditor tunnel` from your laptop. The editor opens without a code.\n',
+    );
+    if (!LOOPBACK_HOSTS.has(opts.host)) {
+      logger.warn(
+        'Non-loopback bind with OTP off: anyone who can reach this host can read the file',
+        {
+          host: opts.host,
+        },
+      );
+      process.stdout.write(
+        `  ⚠️  Bound to ${opts.host} with no OTP — do not expose this on an untrusted network.\n`,
+      );
+    }
     process.stdout.write('\n');
   }
 

@@ -2,14 +2,14 @@
 # Base URL: update @host and @port to match your running server
 # Use the REST Client VS Code extension to run these requests.
 #
-# Security is ENABLED by default. Start the server and note the OTP printed to stdout:
+# OTP is OFF by default. Start the server:
 #   npx reditor serve <file>
 #
-# For testing with a predictable OTP (⚠️ TEST ONLY):
-#   npx reditor serve <file> --force-otp 123
+# To require OTP + JWT:
+#   npx reditor serve <file> --enable-security
 #
-# To disable security entirely (⚠️ DANGER — no auth, anyone can read the file):
-#   npx reditor serve <file> --force-disable-security
+# For testing with a predictable OTP (TEST ONLY):
+#   npx reditor serve <file> --enable-security --force-otp 123
 
 @host = localhost
 @port = 3000
@@ -73,7 +73,7 @@ Content-Type: application/json
 ###
 
 ### Exchange OTP for JWT — security disabled
-# Expected: 404 (route is not registered when --force-disable-security is set)
+# Expected: 404 (route is not registered when OTP is off — the default)
 POST {{baseUrl}}/auth/exchange-token
 Content-Type: application/json
 

@@ -6,13 +6,13 @@
 @port = 3000
 @baseUrl = https://{{host}}:{{port}}
 
-### Health check — server is running (security enabled)
-# Expected: 200 {"status":"ok","securityEnabled":true}
+### Health check — server is running (default, no OTP)
+# Expected: 200 {"status":"ok","securityEnabled":false}
 GET {{baseUrl}}/health
 
 ###
 
-### Health check — server is running (security disabled)
-# Expected: 200 {"status":"ok","securityEnabled":false}
-# Start with: npx reditor serve <file> --force-disable-security
+### Health check — server is running (OTP on)
+# Expected: 200 {"status":"ok","securityEnabled":true}
+# Start with: npx reditor serve <file> --enable-security
 GET {{baseUrl}}/health
