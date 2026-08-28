@@ -32,7 +32,7 @@ module.exports = __toCommonJS(index_exports);
 var loadConfig = (overrides = {}) => ({
   port: overrides.port ?? Number(process.env.PORT ?? 3e3),
   host: overrides.host ?? process.env.HOST ?? "localhost",
-  securityEnabled: overrides.securityEnabled ?? true,
+  securityEnabled: overrides.securityEnabled ?? false,
   useTls: overrides.useTls ?? process.env.USE_TLS !== "false",
   certPath: process.env.CERT_PATH,
   keyPath: process.env.KEY_PATH,
@@ -48,18 +48,31 @@ var import_crypto = require("crypto");
 var generateOtp = () => String((0, import_crypto.randomInt)(1e5, 1e6));
 
 // src/core/tunnel/buildSshArgs.ts
-var buildSshArgs = (request) => [
-  "-N",
-  "-L",
-  `${request.localPort}:${request.remoteHost}:${request.remotePort}`,
-  "-o",
-  "ExitOnForwardFailure=yes",
-  "-o",
-  "ServerAliveInterval=30",
-  "-o",
-  "ServerAliveCountMax=3",
-  request.target
-];
+var buildSshArgs = (request) => {
+  const args = [
+    "-N",
+    "-L",
+    `${request.localPort}:${request.remoteHost}:${request.remotePort}`
+  ];
+  if (request.sshPort !== void 0) {
+    args.push("-p", String(request.sshPort));
+  }
+  if (request.identity !== void 0) {
+    args.push("-i", request.identity, "-o", "IdentitiesOnly=yes");
+  }
+  args.push(
+    "-o",
+    "ExitOnForwardFailure=yes",
+    "-o",
+    "StrictHostKeyChecking=accept-new",
+    "-o",
+    "ServerAliveInterval=30",
+    "-o",
+    "ServerAliveCountMax=3",
+    request.target
+  );
+  return args;
+};
 
 // src/core/tunnel/validator.ts
 var isValidPort = (value) => Number.isInteger(value) && value >= 1 && value <= 65535;

@@ -104,6 +104,7 @@ The compose entrypoint writes `demo/.ssh/id_ed25519` on first boot. Open `https:
 - **Browser editor** — syntax highlighting from the file extension (`yaml`, `json`, `nginx.conf`, and more)
 - **Save from the browser** — one click or **⌘S** / **Ctrl+S**; the button stays off until the file is dirty
 - **Session history** — restore earlier saves from this run without leaving the page
+- **Status bar** — serve state, tunnel, directory, host, and port at the bottom of the editor
 - **HTTPS** — self-signed cert generated automatically (or bring your own)
 - **OTP + JWT (opt-in)** — `--enable-security` prints a 6-digit code; RS256 token in the browser
 - **3-strike lockout** — with OTP on, three bad attempts and the process exits
@@ -184,6 +185,7 @@ Auth is a `Authorization: Bearer <jwt>` header when `--enable-security` is on.
 |---|---|---|---|
 | `GET` | `/health` | no | `{ "status": "ok", "securityEnabled": false }` |
 | `POST` | `/auth/exchange-token` | OTP body | `{ "otp": "482910" }` → JWT. Missing when security is off. 3 failures → process exit |
+| `GET` | `/status` | JWT | Serve host, port, directory, TLS, security |
 | `GET` | `/file-meta` | JWT | Filename, size, type |
 | `GET` | `/file` | JWT | Raw file content |
 | `PUT` | `/file` | JWT | `{ "content": "…" }` → `204` |

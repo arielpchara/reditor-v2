@@ -5,9 +5,11 @@ import { OtpDialog } from '../OtpDialog';
 import { Toolbar } from '../Toolbar';
 import { Toast, ToastKind } from '../Toast';
 import { HistoryDrawer, ContentVersion, hashContent } from '../HistoryDrawer';
+import { StatusBar } from '../StatusBar';
 import { clearSessionToken, getSessionToken } from '../../otpApi';
 import { detectLanguage } from '../../detectLanguage';
 import { fetchWithAuth } from '../../fileApi';
+import { ServeStatus, isTunnelAccess } from '../../serveStatus';
 
 type ToastState = { message: string; kind: ToastKind; key: number } | null;
 type LoadPhase = 'loading' | 'auth' | 'ready' | 'error';
@@ -24,6 +26,7 @@ export function App(): JSX.Element {
   const [history, setHistory] = useState<ContentVersion[]>([]);
   const [currentHash, setCurrentHash] = useState('');
   const [historyOpen, setHistoryOpen] = useState(false);
+  const [serveStatus, setServeStatus] = useState<ServeStatus | null>(null);
   const savedContentRef = useRef<string>('');
   const savingRef = useRef(false);
 
@@ -47,6 +50,15 @@ export function App(): JSX.Element {
     setFilename(meta.filename);
     setLanguage(detectLanguage(meta.filename));
     document.title = `Reditor — ${meta.filename}`;
+
+    const statusRes = await fetchWithAuth('/status');
+    if (statusRes.status === 401) {
+      beginReauth();
+      return;
+    }
+    if (statusRes.ok) {
+      setServeStatus((await statusRes.json()) as ServeStatus);
+    }
 
     const fileRes = await fetchWithAuth('/file');
     if (fileRes.status === 401) {
@@ -201,6 +213,17 @@ export function App(): JSX.Element {
           message={toast.message}
           kind={toast.kind}
           onHide={() => setToast(null)}
+        />
+      )}
+      {serveStatus && (
+        <StatusBar
+          serveOk={serveStatus.status === 'ok'}
+          tunnel={isTunnelAccess(window.location, serveStatus.port)}
+          directory={serveStatus.directory}
+          host={serveStatus.host}
+          port={serveStatus.port}
+          useTls={serveStatus.useTls}
+          securityEnabled={serveStatus.securityEnabled}
         />
       )}
     </>

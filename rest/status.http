@@ -1,0 +1,25 @@
+# status — reditor HTTP scenarios
+# Base URL: update @host and @port to match your running server
+# Use the REST Client VS Code extension to run these requests.
+
+@host = localhost
+@port = 3000
+@baseUrl = https://{{host}}:{{port}}
+@token = <paste JWT token here after calling /auth/exchange-token>
+
+### Serve status — no security
+# Expected: 200 {"status":"ok","host":"localhost","port":3000,"directory":"...","useTls":true,"securityEnabled":false}
+GET {{baseUrl}}/status
+
+###
+
+### Serve status — with JWT (security enabled)
+# Expected: 200 {"status":"ok","host":"localhost","port":3000,"directory":"...","useTls":true,"securityEnabled":true}
+GET {{baseUrl}}/status
+Authorization: Bearer {{token}}
+
+###
+
+### Serve status — missing token when security is on
+# Expected: 401 {"error":"Authorization header missing or malformed"}
+GET {{baseUrl}}/status

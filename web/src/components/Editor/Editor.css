@@ -1,6 +1,6 @@
 .editor {
   width: 100vw;
-  height: calc(100vh - var(--toolbar-height));
+  height: calc(100vh - var(--toolbar-height) - var(--statusbar-height));
   display: grid;
   overflow: auto;
 }

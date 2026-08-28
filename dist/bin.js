@@ -24,32 +24,34 @@ var __toESM = (mod, isNodeMode, target) => (target = mod != null ? __create(__ge
 ));
 
 // src/bin.ts
-var import_path8 = __toESM(require("path"));
+var import_path9 = __toESM(require("path"));
 
 // src/adapters/cli/program.ts
 var import_commander = require("commander");
 var SERVE_DEFAULTS = {
   port: "3000",
   host: "localhost",
-  forceDisableSecurity: false,
+  enableSecurity: false,
   tokenTtl: "300",
   forceOtp: void 0,
   create: false
 };
 var TUNNEL_DEFAULTS = {
   port: "8080",
-  remotePort: "3000"
+  remotePort: "3000",
+  sshPort: void 0,
+  identity: void 0
 };
 var buildProgram = () => {
   const program = new import_commander.Command();
   program.name("reditor").description("Edit files from your server in the browser.");
   program.command("serve", { isDefault: true }).description("Start the web server").argument("[file]", "Path to the file to edit in the browser").option("-p, --port <port>", "Port to listen on", "3000").option("-H, --host <host>", "Host to bind to", "localhost").option(
-    "--force-disable-security",
-    "[DANGER] Disable OTP and JWT auth \u2014 anyone on the network can access the file",
+    "--enable-security",
+    "Require OTP and JWT (off by default; SSH tunnel is the auth)",
     false
   ).option("--token-ttl <seconds>", "JWT token time-to-live in seconds", "300").option("--force-otp <otp>", "[TEST ONLY] Override the generated OTP with a fixed value").option("--create", "Create the file if it does not exist (skips confirmation prompt)", false).action(() => {
   });
-  program.command("tunnel").description("Open an SSH tunnel from this machine to a remote reditor serve").argument("[target]", "SSH target (user@host or an SSH config Host)").option("-p, --port <port>", "Local port to listen on", "8080").option("--remote-port <port>", "Remote reditor serve port", "3000").action(() => {
+  program.command("tunnel").description("Open an SSH tunnel from this machine to a remote reditor serve").argument("[target]", "SSH target (user@host or an SSH config Host)").option("-p, --port <port>", "Local port to listen on", "8080").option("--remote-port <port>", "Remote reditor serve port", "3000").option("--ssh-port <port>", "SSH port on the target host").option("-i, --identity <file>", "SSH private key").action(() => {
   });
   return program;
 };
@@ -291,6 +293,27 @@ var makeFileMetaHandler = ({ config, logger: logger2, files }) => {
   };
 };
 
+// src/adapters/http/statusHandler.ts
+var import_path3 = __toESM(require("path"));
+var makeStatusHandler = ({ config, logger: logger2 }) => {
+  return (_req, res) => {
+    const directory = import_path3.default.dirname(config.file);
+    logger2.debug("Serve status requested", {
+      host: config.host,
+      port: config.port,
+      directory
+    });
+    res.json({
+      status: "ok",
+      host: config.host,
+      port: config.port,
+      directory,
+      useTls: config.useTls,
+      securityEnabled: config.securityEnabled
+    });
+  };
+};
+
 // src/adapters/http/authMiddleware.ts
 var makeAuthMiddleware = ({ config, logger: logger2, tokens }) => (req, res, next) => {
   if (!config.securityEnabled) {
@@ -330,6 +353,8 @@ var registerRoutes = (app, runtime) => {
     logger2.info("Registered route: POST /auth/exchange-token (security enabled)");
   }
   const auth = makeAuthMiddleware(runtime);
+  app.get("/status", auth, makeStatusHandler(runtime));
+  logger2.info("Registered route: GET /status", { authRequired: config.securityEnabled });
   app.get("/file-meta", auth, makeFileMetaHandler(runtime));
   logger2.info("Registered route: GET /file-meta", { authRequired: config.securityEnabled });
   app.get("/file", auth, makeFileHandler(runtime));
@@ -343,8 +368,8 @@ var registerRoutes = (app, runtime) => {
 
 // src/adapters/http/staticHandler.ts
 var import_express = __toESM(require("express"));
-var import_path3 = __toESM(require("path"));
-var resolveWebDir = () => __filename.endsWith(".ts") ? import_path3.default.resolve(process.cwd(), "dist/web") : import_path3.default.resolve(__dirname, "web");
+var import_path4 = __toESM(require("path"));
+var resolveWebDir = () => __filename.endsWith(".ts") ? import_path4.default.resolve(process.cwd(), "dist/web") : import_path4.default.resolve(__dirname, "web");
 var createStaticHandler = (logger2) => {
   const webDir = resolveWebDir();
   logger2.info("Serving static files", { webDir });
@@ -440,18 +465,31 @@ var startServer = (runtime) => new Promise((resolve, reject) => {
 
 // src/core/tunnel/buildSshArgs.ts
 var DEFAULT_TUNNEL_REMOTE_HOST = "127.0.0.1";
-var buildSshArgs = (request) => [
-  "-N",
-  "-L",
-  `${request.localPort}:${request.remoteHost}:${request.remotePort}`,
-  "-o",
-  "ExitOnForwardFailure=yes",
-  "-o",
-  "ServerAliveInterval=30",
-  "-o",
-  "ServerAliveCountMax=3",
-  request.target
-];
+var buildSshArgs = (request) => {
+  const args = [
+    "-N",
+    "-L",
+    `${request.localPort}:${request.remoteHost}:${request.remotePort}`
+  ];
+  if (request.sshPort !== void 0) {
+    args.push("-p", String(request.sshPort));
+  }
+  if (request.identity !== void 0) {
+    args.push("-i", request.identity, "-o", "IdentitiesOnly=yes");
+  }
+  args.push(
+    "-o",
+    "ExitOnForwardFailure=yes",
+    "-o",
+    "StrictHostKeyChecking=accept-new",
+    "-o",
+    "ServerAliveInterval=30",
+    "-o",
+    "ServerAliveCountMax=3",
+    request.target
+  );
+  return args;
+};
 
 // src/core/tunnel/validator.ts
 var isValidPort = (value) => Number.isInteger(value) && value >= 1 && value <= 65535;
@@ -460,11 +498,14 @@ var isValidTarget = (target) => {
   return trimmed.length > 0 && !trimmed.startsWith("-");
 };
 
+// src/core/tunnel/retry.ts
+var DEFAULT_TUNNEL_RETRY_MS = 1e4;
+
 // src/config/index.ts
 var loadConfig = (overrides = {}) => ({
   port: overrides.port ?? Number(process.env.PORT ?? 3e3),
   host: overrides.host ?? process.env.HOST ?? "localhost",
-  securityEnabled: overrides.securityEnabled ?? true,
+  securityEnabled: overrides.securityEnabled ?? false,
   useTls: overrides.useTls ?? process.env.USE_TLS !== "false",
   certPath: process.env.CERT_PATH,
   keyPath: process.env.KEY_PATH,
@@ -477,12 +518,12 @@ var loadConfig = (overrides = {}) => ({
 
 // src/adapters/logger/logger.ts
 var import_fs2 = __toESM(require("fs"));
-var import_path4 = __toESM(require("path"));
+var import_path5 = __toESM(require("path"));
 var import_winston = __toESM(require("winston"));
-var LOG_DIR = import_path4.default.resolve(process.cwd(), "logs");
+var LOG_DIR = import_path5.default.resolve(process.cwd(), "logs");
 import_fs2.default.mkdirSync(LOG_DIR, { recursive: true });
 var LOG_FILE_ID = (/* @__PURE__ */ new Date()).toISOString().replace(/[:.]/g, "-");
-var logFilePath = import_path4.default.join(LOG_DIR, `reditor-${LOG_FILE_ID}.log`);
+var logFilePath = import_path5.default.join(LOG_DIR, `reditor-${LOG_FILE_ID}.log`);
 var consoleFormat = import_winston.default.format.combine(
   import_winston.default.format.colorize(),
   import_winston.default.format.timestamp({ format: "YYYY-MM-DD HH:mm:ss" }),
@@ -519,10 +560,10 @@ var logger = {
 
 // src/adapters/files/reader.ts
 var import_fs3 = __toESM(require("fs"));
-var import_path6 = __toESM(require("path"));
+var import_path7 = __toESM(require("path"));
 
 // src/core/files/validator.ts
-var import_path5 = __toESM(require("path"));
+var import_path6 = __toESM(require("path"));
 
 // src/core/files/types.ts
 var MAX_FILE_SIZE_BYTES = 524288;
@@ -538,16 +579,16 @@ var isTextBuffer = (buf) => {
   }
 };
 var isWithinRoot = (rootDir, resolvedFilePath) => {
-  const normalRoot = import_path5.default.resolve(rootDir) + import_path5.default.sep;
-  const normalFile = import_path5.default.resolve(resolvedFilePath);
-  return normalFile.startsWith(normalRoot) || normalFile === import_path5.default.resolve(rootDir);
+  const normalRoot = import_path6.default.resolve(rootDir) + import_path6.default.sep;
+  const normalFile = import_path6.default.resolve(resolvedFilePath);
+  return normalFile.startsWith(normalRoot) || normalFile === import_path6.default.resolve(rootDir);
 };
 var isWithinSizeLimit = (sizeBytes, maxBytes = MAX_FILE_SIZE_BYTES) => sizeBytes <= maxBytes;
 
 // src/adapters/files/reader.ts
 var errorMessage = (e) => e instanceof Error ? e.message : String(e);
 var readFile = (rootDir, relativePath) => {
-  const resolvedPath = import_path6.default.resolve(rootDir, relativePath);
+  const resolvedPath = import_path7.default.resolve(rootDir, relativePath);
   if (!isWithinRoot(rootDir, resolvedPath)) {
     return { ok: false, error: { kind: "PATH_TRAVERSAL", path: relativePath } };
   }
@@ -626,10 +667,10 @@ var writeFile = (absolutePath, content) => {
 
 // src/adapters/files/creator.ts
 var import_fs5 = __toESM(require("fs"));
-var import_path7 = __toESM(require("path"));
+var import_path8 = __toESM(require("path"));
 var createFile = (filePath) => {
   try {
-    import_fs5.default.mkdirSync(import_path7.default.dirname(filePath), { recursive: true });
+    import_fs5.default.mkdirSync(import_path8.default.dirname(filePath), { recursive: true });
     import_fs5.default.writeFileSync(filePath, "", { flag: "wx" });
     return { ok: true };
   } catch (err) {
@@ -764,34 +805,83 @@ var promptCreateFile = (filePath, createInterface = import_readline.default.crea
 
 // src/adapters/tunnel/openTunnel.ts
 var import_child_process = require("child_process");
-var openSshTunnel = (request, spawnFn = import_child_process.spawn) => {
-  const child = spawnFn("ssh", buildSshArgs(request), { stdio: "inherit" });
-  let settled = false;
-  const wait = () => new Promise((resolve, reject) => {
-    child.once("error", (err) => {
-      if (settled) {
-        return;
-      }
-      settled = true;
-      reject(err);
-    });
-    child.once("close", (code) => {
-      if (settled) {
-        return;
-      }
-      settled = true;
-      resolve(code ?? 1);
-    });
-  });
+var defaultDelay = (ms) => new Promise((resolve) => {
+  setTimeout(resolve, ms);
+});
+var openSshTunnel = (request, deps) => {
+  const spawnFn = deps.spawnFn ?? import_child_process.spawn;
+  const delayFn = deps.delayFn ?? defaultDelay;
+  const retryMs = deps.retryMs ?? DEFAULT_TUNNEL_RETRY_MS;
+  const { logger: logger2 } = deps;
+  let child;
+  let stopped = false;
+  let attempt = 0;
+  let exitCode = 0;
   const close = () => {
-    if (!child.killed) {
+    stopped = true;
+    if (child && !child.killed) {
       child.kill("SIGTERM");
     }
   };
+  const runOnce = () => new Promise((resolve) => {
+    let settled = false;
+    const finish = (next) => {
+      if (settled) {
+        return;
+      }
+      settled = true;
+      resolve(next);
+    };
+    attempt += 1;
+    logger2.info("Connecting SSH tunnel", { attempt, target: request.target });
+    try {
+      child = spawnFn("ssh", buildSshArgs(request), { stdio: "inherit" });
+    } catch (err) {
+      const error = err instanceof Error ? err : new Error(String(err));
+      logger2.warn("SSH tunnel failed to start", { attempt, error: error.message });
+      finish(stopped ? "stop" : "retry");
+      return;
+    }
+    child.once("error", (err) => {
+      if (stopped) {
+        finish("stop");
+        return;
+      }
+      const code = err.code;
+      if (code === "ENOENT") {
+        logger2.error("ssh executable not found on PATH");
+        stopped = true;
+        exitCode = 1;
+        finish("stop");
+        return;
+      }
+      logger2.warn("SSH tunnel connection failed", { attempt, error: err.message });
+      finish("retry");
+    });
+    child.once("close", (code) => {
+      if (stopped) {
+        finish("stop");
+        return;
+      }
+      logger2.warn("SSH tunnel disconnected", { attempt, code: code ?? 1 });
+      finish("retry");
+    });
+  });
+  const wait = async () => {
+    while (!stopped) {
+      const result = await runOnce();
+      if (result === "stop" || stopped) {
+        break;
+      }
+      logger2.info("Retrying SSH tunnel", { nextAttempt: attempt + 1, delayMs: retryMs });
+      await delayFn(retryMs);
+    }
+    return exitCode;
+  };
   return { wait, close };
 };
-var createSshTunnelOpener = (spawnFn = import_child_process.spawn) => ({
-  open: (request) => openSshTunnel(request, spawnFn)
+var createSshTunnelOpener = (deps) => ({
+  open: (request) => openSshTunnel(request, deps)
 });
 
 // src/bin.ts
@@ -812,26 +902,43 @@ var runTunnel = async (parsed) => {
     logger.error("Invalid remote port", { remotePort: parsed.opts.remotePort });
     process.exit(1);
   }
+  let sshPort;
+  if (parsed.opts.sshPort !== void 0) {
+    sshPort = Number(parsed.opts.sshPort);
+    if (!isValidPort(sshPort)) {
+      logger.error("Invalid SSH port", { sshPort: parsed.opts.sshPort });
+      process.exit(1);
+    }
+  }
   process.stdout.write("\n");
   process.stdout.write("  \u{1F687} SSH tunnel\n");
   process.stdout.write(`     https://localhost:${localPort}  \u2192  ${rawTarget}:${remotePort}
 `);
+  if (sshPort !== void 0) {
+    process.stdout.write(`     SSH port ${sshPort}
+`);
+  }
   process.stdout.write(
     "     Leave this running. Restart serve on the server without resetting the tunnel.\n"
   );
   process.stdout.write("\n");
+  const identity = parsed.opts.identity;
   logger.info("Opening SSH tunnel", {
     target: rawTarget,
     localPort,
     remotePort,
+    sshPort,
+    identity,
     remoteHost: DEFAULT_TUNNEL_REMOTE_HOST
   });
-  const tunnels = createSshTunnelOpener();
+  const tunnels = createSshTunnelOpener({ logger });
   const session = tunnels.open({
     target: rawTarget,
     localPort,
     remotePort,
-    remoteHost: DEFAULT_TUNNEL_REMOTE_HOST
+    remoteHost: DEFAULT_TUNNEL_REMOTE_HOST,
+    sshPort,
+    identity
   });
   const stop = () => {
     session.close();
@@ -859,7 +966,7 @@ var runServe = async (parsed) => {
     process.exit(1);
   }
   const files = createFileStore();
-  const absoluteFile = import_path8.default.resolve(rawFile);
+  const absoluteFile = import_path9.default.resolve(rawFile);
   const validation = files.validate(absoluteFile);
   if (!validation.ok) {
     const { error } = validation;
@@ -927,15 +1034,28 @@ var runServe = async (parsed) => {
     logger.error("Invalid token TTL", { tokenTtl: opts.tokenTtl });
     process.exit(1);
   }
-  const securityEnabled = !opts.forceDisableSecurity;
+  const securityEnabled = opts.enableSecurity;
   const isForced = securityEnabled && opts.forceOtp !== void 0;
   const otp = securityEnabled ? opts.forceOtp ?? generateOtp() : void 0;
-  if (opts.forceDisableSecurity) {
-    logger.warn("--force-disable-security is active: OTP and JWT auth are DISABLED");
+  if (!securityEnabled) {
+    logger.info("OTP disabled (default); SSH tunnel is the recommended access path");
     process.stdout.write("\n");
-    process.stdout.write("  \u26A0\uFE0F  WARNING: Security is DISABLED via --force-disable-security\n");
-    process.stdout.write("     Anyone with network access to this server can read the file.\n");
-    process.stdout.write("     Never use this flag in production or on untrusted networks.\n");
+    process.stdout.write("  Open (no OTP)\n");
+    process.stdout.write(
+      "     Use `reditor tunnel` from your laptop. The editor opens without a code.\n"
+    );
+    if (!LOOPBACK_HOSTS.has(opts.host)) {
+      logger.warn(
+        "Non-loopback bind with OTP off: anyone who can reach this host can read the file",
+        {
+          host: opts.host
+        }
+      );
+      process.stdout.write(
+        `  \u26A0\uFE0F  Bound to ${opts.host} with no OTP \u2014 do not expose this on an untrusted network.
+`
+      );
+    }
     process.stdout.write("\n");
   }
   if (otp) {

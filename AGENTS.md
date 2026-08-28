@@ -109,7 +109,7 @@ npx reditor serve ./settings.json --enable-security
 - Set `CERT_PATH` / `KEY_PATH` to use your own certs
 - Set `PORT` / `HOST` to override defaults (CLI flags take precedence)
 - Serves the built web UI at `/`
-- API: `GET /health`, `POST /auth/exchange-token`, `GET /file-meta`, `GET /file`, `PUT /file`
+- API: `GET /health`, `POST /auth/exchange-token`, `GET /status`, `GET /file-meta`, `GET /file`, `PUT /file`
 
 ---
 
@@ -184,7 +184,8 @@ web/src/
 │   ├── OtpDialog/
 │   ├── Toolbar/
 │   ├── Toast/
-│   └── HistoryDrawer/
+│   ├── HistoryDrawer/
+│   └── StatusBar/
 ├── __tests__/
 │   ├── components/
 │   ├── otpApi.test.ts
