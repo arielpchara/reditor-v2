@@ -11,7 +11,7 @@
 
 @host = localhost
 @port = 3000
-@baseUrl = https://{{host}}:{{port}}
+@baseUrl = http://{{host}}:{{port}}
 @token = <paste JWT token here>
 
 ### GET /file-meta — filename info (no security)

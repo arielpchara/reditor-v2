@@ -55,7 +55,7 @@ Every `.http` file must start with:
 
 @host = localhost
 @port = 3000
-@baseUrl = https://{{host}}:{{port}}
+@baseUrl = http://{{host}}:{{port}}
 ```
 
 If security is involved, add a token variable:

@@ -16,7 +16,7 @@ export const loadConfig = (overrides: ConfigOverrides = {}): AppConfig => ({
   port: overrides.port ?? Number(process.env.PORT ?? 3000),
   host: overrides.host ?? process.env.HOST ?? 'localhost',
   securityEnabled: overrides.securityEnabled ?? false,
-  useTls: overrides.useTls ?? process.env.USE_TLS !== 'false',
+  useTls: overrides.useTls ?? process.env.USE_TLS === 'true',
   certPath: process.env.CERT_PATH,
   keyPath: process.env.KEY_PATH,
   otp: overrides.otp,

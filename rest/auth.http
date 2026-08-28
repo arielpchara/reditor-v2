@@ -13,7 +13,7 @@
 
 @host = localhost
 @port = 3000
-@baseUrl = https://{{host}}:{{port}}
+@baseUrl = http://{{host}}:{{port}}
 
 # After a successful exchange, paste the returned token here to use authenticated endpoints:
 @token = <paste JWT token here>

@@ -4,7 +4,7 @@
 
 @host = localhost
 @port = 3000
-@baseUrl = https://{{host}}:{{port}}
+@baseUrl = http://{{host}}:{{port}}
 
 ### Health check — server is running (default, no OTP)
 # Expected: 200 {"status":"ok","securityEnabled":false}

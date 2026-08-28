@@ -34,13 +34,15 @@ var SERVE_DEFAULTS = {
   enableSecurity: false,
   tokenTtl: "300",
   forceOtp: void 0,
-  create: false
+  create: false,
+  https: false
 };
 var TUNNEL_DEFAULTS = {
   port: "8080",
   remotePort: "3000",
   sshPort: void 0,
-  identity: void 0
+  identity: void 0,
+  https: false
 };
 var buildProgram = () => {
   const program = new import_commander.Command();
@@ -49,9 +51,9 @@ var buildProgram = () => {
     "--enable-security",
     "Require OTP and JWT (off by default; SSH tunnel is the auth)",
     false
-  ).option("--token-ttl <seconds>", "JWT token time-to-live in seconds", "300").option("--force-otp <otp>", "[TEST ONLY] Override the generated OTP with a fixed value").option("--create", "Create the file if it does not exist (skips confirmation prompt)", false).action(() => {
+  ).option("--token-ttl <seconds>", "JWT token time-to-live in seconds", "300").option("--force-otp <otp>", "[TEST ONLY] Override the generated OTP with a fixed value").option("--create", "Create the file if it does not exist (skips confirmation prompt)", false).option("--https", "Serve over HTTPS (off by default)", false).action(() => {
   });
-  program.command("tunnel").description("Open an SSH tunnel from this machine to a remote reditor serve").argument("[target]", "SSH target (user@host or an SSH config Host)").option("-p, --port <port>", "Local port to listen on", "8080").option("--remote-port <port>", "Remote reditor serve port", "3000").option("--ssh-port <port>", "SSH port on the target host").option("-i, --identity <file>", "SSH private key").action(() => {
+  program.command("tunnel").description("Open an SSH tunnel from this machine to a remote reditor serve").argument("[target]", "SSH target (user@host or an SSH config Host)").option("-p, --port <port>", "Local port to listen on", "8080").option("--remote-port <port>", "Remote reditor serve port", "3000").option("--ssh-port <port>", "SSH port on the target host").option("-i, --identity <file>", "SSH private key").option("--https", "Remote serve uses HTTPS (off by default)", false).action(() => {
   });
   return program;
 };
@@ -499,14 +501,41 @@ var isValidTarget = (target) => {
 };
 
 // src/core/tunnel/retry.ts
-var DEFAULT_TUNNEL_RETRY_MS = 1e4;
+var DEFAULT_TUNNEL_RETRY_MS = 1e3;
+
+// src/core/browser/url.ts
+var buildEditorUrl = (port, useTls) => `${useTls ? "https" : "http"}://localhost:${port}`;
+var buildHealthUrl = (port, useTls) => `${useTls ? "https" : "http"}://127.0.0.1:${port}/health`;
+
+// src/core/browser/openCommand.ts
+var buildOpenUrlCommand = (url, platform) => {
+  if (platform === "darwin") {
+    return { command: "open", args: [url] };
+  }
+  if (platform === "win32") {
+    return { command: "cmd", args: ["/c", "start", "", url] };
+  }
+  return { command: "xdg-open", args: [url] };
+};
+
+// src/core/browser/waitUntilReady.ts
+var DEFAULT_BROWSER_POLL_MS = 300;
+var waitUntilReady = async (check, delay, intervalMs, isStopped) => {
+  while (!isStopped()) {
+    if (await check()) {
+      return true;
+    }
+    await delay(intervalMs);
+  }
+  return false;
+};
 
 // src/config/index.ts
 var loadConfig = (overrides = {}) => ({
   port: overrides.port ?? Number(process.env.PORT ?? 3e3),
   host: overrides.host ?? process.env.HOST ?? "localhost",
   securityEnabled: overrides.securityEnabled ?? false,
-  useTls: overrides.useTls ?? process.env.USE_TLS !== "false",
+  useTls: overrides.useTls ?? process.env.USE_TLS === "true",
   certPath: process.env.CERT_PATH,
   keyPath: process.env.KEY_PATH,
   otp: overrides.otp,
@@ -817,8 +846,11 @@ var openSshTunnel = (request, deps) => {
   let stopped = false;
   let attempt = 0;
   let exitCode = 0;
+  let interruptDelay;
   const close = () => {
     stopped = true;
+    interruptDelay?.();
+    interruptDelay = void 0;
     if (child && !child.killed) {
       child.kill("SIGTERM");
     }
@@ -874,7 +906,13 @@ var openSshTunnel = (request, deps) => {
         break;
       }
       logger2.info("Retrying SSH tunnel", { nextAttempt: attempt + 1, delayMs: retryMs });
-      await delayFn(retryMs);
+      await Promise.race([
+        delayFn(retryMs),
+        new Promise((resolve) => {
+          interruptDelay = resolve;
+        })
+      ]);
+      interruptDelay = void 0;
     }
     return exitCode;
   };
@@ -882,6 +920,47 @@ var openSshTunnel = (request, deps) => {
 };
 var createSshTunnelOpener = (deps) => ({
   open: (request) => openSshTunnel(request, deps)
+});
+
+// src/adapters/browser/openUrl.ts
+var import_child_process2 = require("child_process");
+var createBrowserOpener = (deps) => ({
+  open: (url) => {
+    const platform = deps.platform ?? process.platform;
+    const { command, args } = buildOpenUrlCommand(url, platform);
+    const spawnFn = deps.spawnFn ?? import_child_process2.spawn;
+    try {
+      const child = spawnFn(command, args, { stdio: "ignore", detached: true });
+      child.once("error", (err) => {
+        deps.logger.warn("Failed to open browser", { url, error: err.message });
+      });
+      child.unref();
+      deps.logger.info("Opened editor in browser", { url });
+      return { ok: true };
+    } catch (err) {
+      const error = err instanceof Error ? err : new Error(String(err));
+      deps.logger.warn("Failed to open browser", { url, error: error.message });
+      return { ok: false, error: error.message };
+    }
+  }
+});
+
+// src/adapters/browser/probeHealth.ts
+var import_http2 = __toESM(require("http"));
+var import_https2 = __toESM(require("https"));
+var probeHealth = (url) => new Promise((resolve) => {
+  const onResponse = (res) => {
+    res.resume();
+    resolve(res.statusCode === 200);
+  };
+  const req = url.startsWith("https:") ? import_https2.default.get(url, { rejectUnauthorized: false }, onResponse) : import_http2.default.get(url, onResponse);
+  req.on("error", () => {
+    resolve(false);
+  });
+  req.setTimeout(1500, () => {
+    req.destroy();
+    resolve(false);
+  });
 });
 
 // src/bin.ts
@@ -910,9 +989,11 @@ var runTunnel = async (parsed) => {
       process.exit(1);
     }
   }
+  const useTls = parsed.opts.https;
+  const editorUrl = buildEditorUrl(localPort, useTls);
   process.stdout.write("\n");
   process.stdout.write("  \u{1F687} SSH tunnel\n");
-  process.stdout.write(`     https://localhost:${localPort}  \u2192  ${rawTarget}:${remotePort}
+  process.stdout.write(`     ${editorUrl}  \u2192  ${rawTarget}:${remotePort}
 `);
   if (sshPort !== void 0) {
     process.stdout.write(`     SSH port ${sshPort}
@@ -921,6 +1002,7 @@ var runTunnel = async (parsed) => {
   process.stdout.write(
     "     Leave this running. Restart serve on the server without resetting the tunnel.\n"
   );
+  process.stdout.write("     The editor opens in your browser when the tunnel is up.\n");
   process.stdout.write("\n");
   const identity = parsed.opts.identity;
   logger.info("Opening SSH tunnel", {
@@ -929,6 +1011,7 @@ var runTunnel = async (parsed) => {
     remotePort,
     sshPort,
     identity,
+    useTls,
     remoteHost: DEFAULT_TUNNEL_REMOTE_HOST
   });
   const tunnels = createSshTunnelOpener({ logger });
@@ -940,11 +1023,32 @@ var runTunnel = async (parsed) => {
     sshPort,
     identity
   });
+  let stopped = false;
   const stop = () => {
+    stopped = true;
     session.close();
   };
   process.on("SIGINT", stop);
   process.on("SIGTERM", stop);
+  const browsers = createBrowserOpener({ logger });
+  void waitUntilReady(
+    () => probeHealth(buildHealthUrl(localPort, useTls)),
+    (ms) => new Promise((resolve) => {
+      setTimeout(resolve, ms);
+    }),
+    DEFAULT_BROWSER_POLL_MS,
+    () => stopped
+  ).then((ready) => {
+    if (!ready) {
+      return;
+    }
+    browsers.open(editorUrl);
+    process.stdout.write(`     Opened ${editorUrl}
+`);
+  }).catch((err) => {
+    const error = err instanceof Error ? err : new Error(String(err));
+    logger.warn("Failed while waiting to open browser", { error: error.message });
+  });
   try {
     const code = await session.wait();
     process.exit(code);
@@ -1069,6 +1173,7 @@ var runServe = async (parsed) => {
   const config = loadConfig({
     port,
     host: opts.host,
+    useTls: opts.https ? true : void 0,
     securityEnabled,
     otp,
     tokenTtl,
