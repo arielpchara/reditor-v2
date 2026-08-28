@@ -40,4 +40,16 @@ describe('buildSshArgs', () => {
     const args = buildSshArgs(request({ remoteHost: 'localhost' }));
     expect(args).toContain('8080:localhost:3000');
   });
+
+  it('omits -p when sshPort is unset', () => {
+    const args = buildSshArgs(request());
+    expect(args).not.toContain('-p');
+  });
+
+  it('passes -p when sshPort is set', () => {
+    const args = buildSshArgs(request({ sshPort: 2222 }));
+    const idx = args.indexOf('-p');
+    expect(idx).toBeGreaterThan(0);
+    expect(args[idx + 1]).toBe('2222');
+  });
 });

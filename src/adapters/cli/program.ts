@@ -12,6 +12,7 @@ export type ServeOptions = {
 export type TunnelOptions = {
   port: string;
   remotePort: string;
+  sshPort: string | undefined;
 };
 
 export type ParsedServeCommand = {
@@ -40,6 +41,7 @@ const SERVE_DEFAULTS: ServeOptions = {
 const TUNNEL_DEFAULTS: TunnelOptions = {
   port: '8080',
   remotePort: '3000',
+  sshPort: undefined,
 };
 
 export const buildProgram = (): Command => {
@@ -71,6 +73,7 @@ export const buildProgram = (): Command => {
     .argument('[target]', 'SSH target (user@host or an SSH config Host)')
     .option('-p, --port <port>', 'Local port to listen on', '8080')
     .option('--remote-port <port>', 'Remote reditor serve port', '3000')
+    .option('--ssh-port <port>', 'SSH port on the target host')
     .action(() => {
       // action is handled in bin.ts to keep this file pure/testable
     });

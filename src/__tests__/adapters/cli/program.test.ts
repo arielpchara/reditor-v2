@@ -91,6 +91,15 @@ describe('parseCli', () => {
     }
     expect(parsed.opts.port).toBe('8080');
     expect(parsed.opts.remotePort).toBe('3000');
+    expect(parsed.opts.sshPort).toBeUndefined();
+  });
+
+  it('parses --ssh-port', () => {
+    const parsed = parseCli(tunnelArgv('user@box', '--ssh-port', '2222'));
+    if (parsed.command !== 'tunnel') {
+      throw new Error('expected tunnel');
+    }
+    expect(parsed.opts.sshPort).toBe('2222');
   });
 
   it('parses tunnel --port', () => {

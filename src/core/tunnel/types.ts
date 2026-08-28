@@ -3,6 +3,7 @@ export type TunnelRequest = {
   localPort: number;
   remotePort: number;
   remoteHost: string;
+  sshPort?: number;
 };
 
 export type TunnelSession = {

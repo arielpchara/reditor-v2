@@ -31,9 +31,21 @@ const runTunnel = async (parsed: ParsedTunnelCommand): Promise<void> => {
     process.exit(1);
   }
 
+  let sshPort: number | undefined;
+  if (parsed.opts.sshPort !== undefined) {
+    sshPort = Number(parsed.opts.sshPort);
+    if (!isValidPort(sshPort)) {
+      logger.error('Invalid SSH port', { sshPort: parsed.opts.sshPort });
+      process.exit(1);
+    }
+  }
+
   process.stdout.write('\n');
   process.stdout.write('  🚇 SSH tunnel\n');
   process.stdout.write(`     https://localhost:${localPort}  →  ${rawTarget}:${remotePort}\n`);
+  if (sshPort !== undefined) {
+    process.stdout.write(`     SSH port ${sshPort}\n`);
+  }
   process.stdout.write(
     '     Leave this running. Restart serve on the server without resetting the tunnel.\n',
   );
@@ -43,6 +55,7 @@ const runTunnel = async (parsed: ParsedTunnelCommand): Promise<void> => {
     target: rawTarget,
     localPort,
     remotePort,
+    sshPort,
     remoteHost: DEFAULT_TUNNEL_REMOTE_HOST,
   });
 
@@ -52,6 +65,7 @@ const runTunnel = async (parsed: ParsedTunnelCommand): Promise<void> => {
     localPort,
     remotePort,
     remoteHost: DEFAULT_TUNNEL_REMOTE_HOST,
+    sshPort,
   });
 
   const stop = (): void => {

@@ -83,6 +83,22 @@ npx github:arielpchara/reditor-refactored tunnel user@that-server --port=8080
 
 `npx` downloads, builds, and runs the CLI. First run needs the network; later runs use the cache.
 
+### Docker demo
+
+`serve` binds **127.0.0.1 inside the container**. HTTP is not published — not on `0.0.0.0`, not on the host. The only way in is SSH on `127.0.0.1:2222`, then `reditor tunnel`.
+
+```bash
+docker compose up --build
+```
+
+OTP prints in the compose logs. On your laptop:
+
+```bash
+npx reditor tunnel demo@127.0.0.1 --port=8080 --ssh-port 2222
+```
+
+Password is `demo` (demo only). Open `https://localhost:8080`. Edits land in `./demo` on the host.
+
 ## Features
 
 - **Browser editor** — syntax highlighting from the file extension (`yaml`, `json`, `nginx.conf`, and more)
@@ -127,6 +143,7 @@ npx reditor tunnel <user@host> [--port 8080]
 | `<user@host>` | required | SSH target, or an SSH config `Host` |
 | `-p, --port <port>` | `8080` | Local port — open `https://localhost:<port>` |
 | `--remote-port <port>` | `3000` | Port `serve` is using on the server |
+| `--ssh-port <port>` | `22` | SSH port on the target host |
 
 Opens `ssh -N -L` and stays up until you hit Ctrl+C. Stopping `serve` does not close the tunnel — start another file and reuse it.
 
