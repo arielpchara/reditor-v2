@@ -1,17 +1,82 @@
 import path from 'path';
-import { parseServeCommand } from './adapters/cli/program';
+import { parseCli, ParsedServeCommand, ParsedTunnelCommand } from './adapters/cli/program';
 import { startServer } from './adapters/http';
 import { generateOtp } from './core/security';
+import { DEFAULT_TUNNEL_REMOTE_HOST, isValidPort, isValidTarget } from './core/tunnel';
 import { loadConfig } from './config';
 import { logger, logFilePath } from './adapters/logger';
 import { createFileStore } from './adapters/files';
 import { generateKeyPair, createTokenService } from './adapters/security';
 import { promptCreateFile } from './adapters/cli/promptCreate';
+import { createSshTunnelOpener } from './adapters/tunnel';
 
 const LOOPBACK_HOSTS = new Set(['localhost', '127.0.0.1', '::1']);
 
-async function main(): Promise<void> {
-  const { opts, file: rawFile } = parseServeCommand(process.argv);
+const runTunnel = async (parsed: ParsedTunnelCommand): Promise<void> => {
+  const rawTarget = parsed.target?.trim();
+  if (!rawTarget || !isValidTarget(rawTarget)) {
+    logger.error('Missing SSH target. Usage: reditor tunnel <user@host> [--port 8080]');
+    process.exit(1);
+  }
+
+  const localPort = Number(parsed.opts.port);
+  if (!isValidPort(localPort)) {
+    logger.error('Invalid local port', { port: parsed.opts.port });
+    process.exit(1);
+  }
+
+  const remotePort = Number(parsed.opts.remotePort);
+  if (!isValidPort(remotePort)) {
+    logger.error('Invalid remote port', { remotePort: parsed.opts.remotePort });
+    process.exit(1);
+  }
+
+  process.stdout.write('\n');
+  process.stdout.write('  🚇 SSH tunnel\n');
+  process.stdout.write(`     https://localhost:${localPort}  →  ${rawTarget}:${remotePort}\n`);
+  process.stdout.write(
+    '     Leave this running. Restart serve on the server without resetting the tunnel.\n',
+  );
+  process.stdout.write('\n');
+
+  logger.info('Opening SSH tunnel', {
+    target: rawTarget,
+    localPort,
+    remotePort,
+    remoteHost: DEFAULT_TUNNEL_REMOTE_HOST,
+  });
+
+  const tunnels = createSshTunnelOpener();
+  const session = tunnels.open({
+    target: rawTarget,
+    localPort,
+    remotePort,
+    remoteHost: DEFAULT_TUNNEL_REMOTE_HOST,
+  });
+
+  const stop = (): void => {
+    session.close();
+  };
+  process.on('SIGINT', stop);
+  process.on('SIGTERM', stop);
+
+  try {
+    const code = await session.wait();
+    process.exit(code);
+  } catch (err: unknown) {
+    const error = err instanceof Error ? err : new Error(String(err));
+    const code = (err as NodeJS.ErrnoException).code;
+    if (code === 'ENOENT') {
+      logger.error('ssh executable not found on PATH');
+    } else {
+      logger.error('Failed to open SSH tunnel', { error: error.message, stack: error.stack });
+    }
+    process.exit(1);
+  }
+};
+
+const runServe = async (parsed: ParsedServeCommand): Promise<void> => {
+  const { opts, file: rawFile } = parsed;
 
   if (!rawFile) {
     logger.error('Missing required file path. Usage: reditor serve <file>');
@@ -81,7 +146,7 @@ async function main(): Promise<void> {
   }
 
   const port = Number(opts.port);
-  if (!Number.isInteger(port) || port < 1 || port > 65535) {
+  if (!isValidPort(port)) {
     logger.error('Invalid port', { port: opts.port });
     process.exit(1);
   }
@@ -161,9 +226,18 @@ async function main(): Promise<void> {
     files,
     tokens: createTokenService(),
   });
+};
+
+async function main(): Promise<void> {
+  const parsed = parseCli(process.argv);
+  if (parsed.command === 'tunnel') {
+    await runTunnel(parsed);
+    return;
+  }
+  await runServe(parsed);
 }
 
 main().catch((err: Error) => {
-  logger.error('Failed to start server', { error: err.message, stack: err.stack });
+  logger.error('Failed to start', { error: err.message, stack: err.stack });
   process.exit(1);
 });

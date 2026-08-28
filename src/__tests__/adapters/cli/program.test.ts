@@ -1,6 +1,7 @@
-import { parseServeCommand } from '../../../adapters/cli/program';
+import { parseCli, parseServeCommand } from '../../../adapters/cli/program';
 
 const argv = (...args: string[]) => ['node', 'bin.js', 'serve', ...args];
+const tunnelArgv = (...args: string[]) => ['node', 'bin.js', 'tunnel', ...args];
 
 describe('parseServeCommand', () => {
   it('parses positional file argument', () => {
@@ -70,5 +71,77 @@ describe('parseServeCommand', () => {
   it('defaults create to false when flag is absent', () => {
     const { opts } = parseServeCommand(argv('myfile.ts'));
     expect(opts.create).toBe(false);
+  });
+});
+
+describe('parseCli', () => {
+  it('selects tunnel when the first argument is tunnel', () => {
+    const parsed = parseCli(tunnelArgv('user@box'));
+    expect(parsed.command).toBe('tunnel');
+    if (parsed.command !== 'tunnel') {
+      return;
+    }
+    expect(parsed.target).toBe('user@box');
+  });
+
+  it('defaults tunnel local port to 8080 and remote port to 3000', () => {
+    const parsed = parseCli(tunnelArgv('user@box'));
+    if (parsed.command !== 'tunnel') {
+      throw new Error('expected tunnel');
+    }
+    expect(parsed.opts.port).toBe('8080');
+    expect(parsed.opts.remotePort).toBe('3000');
+  });
+
+  it('parses tunnel --port', () => {
+    const parsed = parseCli(tunnelArgv('--port', '8080', 'user@box'));
+    if (parsed.command !== 'tunnel') {
+      throw new Error('expected tunnel');
+    }
+    expect(parsed.opts.port).toBe('8080');
+    expect(parsed.target).toBe('user@box');
+  });
+
+  it('parses tunnel -p shorthand', () => {
+    const parsed = parseCli(tunnelArgv('-p', '9090', 'prod'));
+    if (parsed.command !== 'tunnel') {
+      throw new Error('expected tunnel');
+    }
+    expect(parsed.opts.port).toBe('9090');
+    expect(parsed.target).toBe('prod');
+  });
+
+  it('parses --remote-port', () => {
+    const parsed = parseCli(tunnelArgv('user@box', '--remote-port', '4000'));
+    if (parsed.command !== 'tunnel') {
+      throw new Error('expected tunnel');
+    }
+    expect(parsed.opts.remotePort).toBe('4000');
+  });
+
+  it('allows a missing tunnel target so bin can print a usage error', () => {
+    const parsed = parseCli(tunnelArgv('--port', '8080'));
+    if (parsed.command !== 'tunnel') {
+      throw new Error('expected tunnel');
+    }
+    expect(parsed.target).toBeUndefined();
+  });
+
+  it('does not treat a file named tunnel as the tunnel command', () => {
+    const parsed = parseCli(argv('tunnel'));
+    expect(parsed.command).toBe('serve');
+    if (parsed.command !== 'serve') {
+      return;
+    }
+    expect(parsed.file).toBe('tunnel');
+  });
+
+  it('keeps serve as the default command', () => {
+    const parsed = parseCli(['node', 'bin.js', 'myfile.ts']);
+    expect(parsed.command).toBe('serve');
+    if (parsed.command !== 'serve') {
+      return;
+    }
+    expect(parsed.file).toBe('myfile.ts');
   });
 });

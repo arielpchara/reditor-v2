@@ -15,53 +15,70 @@
 [![license](https://img.shields.io/badge/license-ISC-blue?style=flat-square)](#license)
 [![typescript](https://img.shields.io/badge/TypeScript-5-3178C6?style=flat-square)](https://www.typescriptlang.org)
 
-SSH into a box. Fight vim. Save a YAML file. Or run one command and edit it in the browser — with OTP in the terminal and HTTPS out of the box.
+SSH into a box. Fight vim. Save a YAML file. Or serve the file on the box, tunnel from your laptop, and edit it in the browser — OTP in the terminal, HTTPS out of the box.
 
 ```bash
+# On the server
 npx reditor serve /etc/nginx/nginx.conf
+
+# On your laptop — leave this running
+npx reditor tunnel user@that-server --port=8080
 ```
 
 ```
-$ npx reditor serve ./config.yaml
+$ npx reditor tunnel user@that-server --port=8080
 
-  🔐 Security enabled
-  🔑 One-Time Password: 482910
-  ⏱  Token TTL: 300s
-     POST /auth/exchange-token with { "otp": "<code>" } to get a JWT.
+  🚇 SSH tunnel
+     https://localhost:8080  →  user@that-server:3000
+     Leave this running. Restart serve on the server without resetting the tunnel.
 ```
 
-Open `https://localhost:3000`. Paste the OTP. Edit. Hit **⌘S** / **Ctrl+S**.
+Open `https://localhost:8080`. Paste the OTP from the server terminal. Edit. Hit **⌘S** / **Ctrl+S**.
 
 ---
 
 ## Why
 
-Editing a config on a remote machine should not mean wrestling a shell editor over SSH. Reditor is a CLI that starts a local HTTPS server and a browser editor for **one file** — aimed at DevOps engineers and anyone who needs to change a file on a box without cloning a repo or installing an IDE.
+Editing a config on a remote machine should not mean wrestling a shell editor over SSH. Reditor starts a localhost HTTPS editor on the server; from your laptop you open an SSH tunnel and edit in the browser. Aimed at DevOps engineers and anyone who needs to change a file on a box without cloning a repo or installing an IDE.
 
-Secure by default. Zero install. Works on the local network.
+Secure by default. Zero install. Keep `serve` bound to localhost — the tunnel is the recommended way in.
 
 ## Quick start
 
-Requires [Node.js](https://nodejs.org) 18 or newer.
+Requires [Node.js](https://nodejs.org) 18 or newer. **Recommended:** tunnel from your laptop so the editor stays on localhost on the server.
 
 ```bash
-# Edit an existing file (OTP + JWT on by default)
+# 1. On the server — OTP prints here
 npx reditor serve ./config.yaml
 
-# Custom port
-npx reditor serve ./app.conf --port 8080
+# 2. On your laptop — leave this open (survives serve restarts)
+npx reditor tunnel user@that-server --port=8080
 
+# 3. Browser
+open https://localhost:8080
+```
+
+Same machine (no SSH):
+
+```bash
+npx reditor serve ./config.yaml
+# then open https://localhost:3000
+```
+
+```bash
 # Create the file if it does not exist
 npx reditor serve ./new.yaml --create
 
-# Bind on the LAN so another machine can open the editor
-npx reditor serve ./settings.json --host 0.0.0.0
+# Serve on a non-default port — match it with --remote-port
+npx reditor serve ./app.conf --port 4000
+npx reditor tunnel user@that-server --port=8080 --remote-port 4000
 ```
 
 Not on npm yet? Run it straight from GitHub:
 
 ```bash
 npx github:arielpchara/reditor-refactored serve ./config.yaml
+npx github:arielpchara/reditor-refactored tunnel user@that-server --port=8080
 ```
 
 `npx` downloads, builds, and runs the CLI. First run needs the network; later runs use the cache.
@@ -74,10 +91,13 @@ npx github:arielpchara/reditor-refactored serve ./config.yaml
 - **HTTPS** — self-signed cert generated automatically (or bring your own)
 - **OTP + JWT** — 6-digit code in the terminal, RS256 token in the browser
 - **3-strike lockout** — three bad OTPs and the process exits
+- **SSH tunnel** — `reditor tunnel --port=8080` on your laptop; stays up when you stop and restart `serve`
 - **Fail-fast validation** — refuses directories, binary files, and anything over 512 KB
-- **Zero install** — `npx reditor serve <file>`
+- **Zero install** — `npx reditor serve <file>` / `npx reditor tunnel <target>`
 
 ## CLI
+
+### `serve` — run on the server
 
 ```bash
 npx reditor serve <file> [options]
@@ -96,9 +116,25 @@ If `<file>` is missing, a directory, too large, or binary, Reditor prints an err
 
 If the file does not exist and you omit `--create`, you get a confirmation prompt.
 
+### `tunnel` — run on your laptop (recommended)
+
+```bash
+npx reditor tunnel <user@host> [--port 8080]
+```
+
+| Argument / option | Default | Description |
+|---|---|---|
+| `<user@host>` | required | SSH target, or an SSH config `Host` |
+| `-p, --port <port>` | `8080` | Local port — open `https://localhost:<port>` |
+| `--remote-port <port>` | `3000` | Port `serve` is using on the server |
+
+Opens `ssh -N -L` and stays up until you hit Ctrl+C. Stopping `serve` does not close the tunnel — start another file and reuse it.
+
+Needs `ssh` on your PATH. Auth uses your existing SSH config and keys.
+
 ## Security
 
-OTP + JWT is **on by default**. Use `--force-disable-security` only on an isolated, trusted network.
+OTP + JWT is **on by default**. Prefer `tunnel` from your laptop instead of binding `serve` to `0.0.0.0`. Use `--force-disable-security` only on an isolated, trusted network.
 
 1. An **RSA-2048** key pair is generated in memory. Restarting the server invalidates every JWT.
 2. A **6-digit OTP** is generated with `crypto.randomInt`.
@@ -148,13 +184,14 @@ Hexagonal architecture (ports and adapters). Conventions live in [AGENTS.md](./A
 
 ```
 src/
-├── core/          # ports + pure domain (files, security, logging)
-├── adapters/      # cli, http, files, security, logger
+├── core/          # ports + pure domain (files, security, logging, tunnel)
+├── adapters/      # cli, http, files, security, logger, tunnel
 ├── config/        # AppConfig
 └── bin.ts         # composition root
 web/               # React + Vite editor (built to dist/web/)
 rest/              # REST Client .http scenarios
 ```
+
 
 ## Contributing
 

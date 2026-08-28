@@ -9,9 +9,37 @@ export type ServeOptions = {
   create: boolean;
 };
 
+export type TunnelOptions = {
+  port: string;
+  remotePort: string;
+};
+
 export type ParsedServeCommand = {
+  command: 'serve';
   opts: ServeOptions;
   file: string | undefined;
+};
+
+export type ParsedTunnelCommand = {
+  command: 'tunnel';
+  opts: TunnelOptions;
+  target: string | undefined;
+};
+
+export type ParsedCli = ParsedServeCommand | ParsedTunnelCommand;
+
+const SERVE_DEFAULTS: ServeOptions = {
+  port: '3000',
+  host: 'localhost',
+  forceDisableSecurity: false,
+  tokenTtl: '300',
+  forceOtp: undefined,
+  create: false,
+};
+
+const TUNNEL_DEFAULTS: TunnelOptions = {
+  port: '8080',
+  remotePort: '3000',
 };
 
 export const buildProgram = (): Command => {
@@ -37,21 +65,39 @@ export const buildProgram = (): Command => {
       // action is handled in bin.ts to keep this file pure/testable
     });
 
+  program
+    .command('tunnel')
+    .description('Open an SSH tunnel from this machine to a remote reditor serve')
+    .argument('[target]', 'SSH target (user@host or an SSH config Host)')
+    .option('-p, --port <port>', 'Local port to listen on', '8080')
+    .option('--remote-port <port>', 'Remote reditor serve port', '3000')
+    .action(() => {
+      // action is handled in bin.ts to keep this file pure/testable
+    });
+
   return program;
 };
 
-export const parseServeCommand = (argv: string[]): ParsedServeCommand => {
+export const parseCli = (argv: string[]): ParsedCli => {
   const program = buildProgram();
   program.parse(argv);
+
+  const invokedTunnel = argv.slice(2)[0] === 'tunnel';
+  if (invokedTunnel) {
+    const cmd = program.commands.find((c) => c.name() === 'tunnel');
+    const opts = cmd?.opts<TunnelOptions>() ?? TUNNEL_DEFAULTS;
+    return { command: 'tunnel', opts, target: cmd?.args[0] };
+  }
+
   const cmd = program.commands.find((c) => c.name() === 'serve');
-  const opts = cmd?.opts<ServeOptions>() ?? {
-    port: '3000',
-    host: 'localhost',
-    forceDisableSecurity: false,
-    tokenTtl: '300',
-    forceOtp: undefined,
-    create: false,
-  };
-  const file: string | undefined = cmd?.args[0];
-  return { opts, file };
+  const opts = cmd?.opts<ServeOptions>() ?? SERVE_DEFAULTS;
+  return { command: 'serve', opts, file: cmd?.args[0] };
+};
+
+export const parseServeCommand = (argv: string[]): ParsedServeCommand => {
+  const parsed = parseCli(argv);
+  if (parsed.command !== 'serve') {
+    return { command: 'serve', opts: SERVE_DEFAULTS, file: undefined };
+  }
+  return parsed;
 };
